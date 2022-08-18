@@ -1,11 +1,11 @@
 namespace go NameNode
-include "NNFile.thrift"
+include "File.thrift"
 include "Msg.thrift"
 
 struct FileResp {
     1: required i32 errCode; 
     2: required string errMsg; 
-    3: NNFile.FileChunks FileInfo; 
+    3: File.FileChunks FileInfo; 
 }
 
 //1. Node Unix文件系统的信息，是目录的逻辑结构的结点信息, 用于List接口
@@ -16,11 +16,11 @@ struct Node {
 
 //1.给client提供的服务
 service ClientServer {
-    FileResp PutFile(1: NNFile.File remoteFile)
-    FileResp GetFile(1: NNFile.File remoteFile)
-    string Stat(1:NNFile.File remoteFile)
-    Msg.Resp DeleteFile(1: NNFile.File remoteFile)
-    Msg.Resp RenameFile(1: NNFile.File remoteFile)
+    FileResp PutFile(1: File.File remoteFile)
+    FileResp GetFile(1: File.File remoteFile)
+    string Stat(1:File.File remoteFile)
+    Msg.Resp DeleteFile(1: File.File remoteFile)
+    Msg.Resp RenameFile(1: File.File remoteFile)
     Msg.Resp Mkdir(1: string path)
     NNFile.Node List(1: string path)
 }
