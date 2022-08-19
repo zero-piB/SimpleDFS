@@ -44,8 +44,27 @@ func GetClient(addr string) *NNServer.ClientServerClient {
 	return client
 }
 
-//SayHello
-func TestSayHello(t *testing.T) {
+//PutFile
+func TestPutFile(t *testing.T) {
+	addr := "localhost:9090"
+	// conf := &thrift.TConfiguration{
+	// 	ConnectTimeout: time.Second, // Use 0 for no timeout
+	// 	SocketTimeout:  time.Second, // Use 0 for no timeout
+	// }
+	client := GetClient(addr)
+	file := &DNServer.File{}
+	file.FileName = "thrift"
+	file.Size = 23
+	rep, err := client.PutFile(ctx, file)
+	if err != nil {
+		t.Errorf("thrift err: %v\n", err)
+	} else {
+		t.Logf("Recevied: %v\n", rep)
+	}
+}
+
+//Stat
+func TestStat(t *testing.T) {
 	addr := "localhost:9090"
 	// conf := &thrift.TConfiguration{
 	// 	ConnectTimeout: time.Second, // Use 0 for no timeout

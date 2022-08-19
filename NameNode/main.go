@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"namenode/DNServer"
@@ -9,6 +10,7 @@ import (
 	"os"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	uuid "github.com/satori/go.uuid"
 )
 
 func Usage() {
@@ -17,13 +19,50 @@ func Usage() {
 	fmt.Fprint(os.Stderr, "\n")
 }
 
+type DN struct {
+	addr         string
+	port         string
+	name         string
+	StorageTotal int
+	StorageAvail int
+}
+
 //定义服务
 type ClientServer struct {
+	chunkSize int //每个chunk的大小：KB
+	DNlist    []*DN
+}
+
+func (this *ClientServer) initConf() {
+	this.chunkSize = 128
+}
+func min(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 //实现IDL里定义的接口
 func (this *ClientServer) PutFile(ctx context.Context, remoteFile *DNServer.File) (_r []*NNServer.ChunkInfo, _err error) {
-	return make([]*NNServer.ChunkInfo, 0), nil
+	avail_chunks := make([]*NNServer.ChunkInfo, 0)
+
+	needSize := int(remoteFile.Size)
+	for i := 0; i < len(this.DNlist); i++ {
+		n := min(needSize, int(this.chunkSize))
+		if n > 0 && this.DNlist[i].StorageAvail >= n {
+			avail_chunks = append(avail_chunks, &NNServer.ChunkInfo{
+				ID:   uuid.NewV4().String(),
+				Addr: this.DNlist[i].addr,
+				Port: this.DNlist[i].port,
+			})
+		}
+	}
+	if needSize > 0 {
+		return make([]*NNServer.ChunkInfo, 0), errors.New("Not Enough Space")
+	}
+
+	return avail_chunks, nil
 }
 func (this *ClientServer) GetFile(ctx context.Context, remoteFile *DNServer.File) (_r []*NNServer.ChunkInfo, _err error) {
 	return make([]*NNServer.ChunkInfo, 0), nil
@@ -68,11 +107,6 @@ func (this *ClientServer) List(ctx context.Context, path string) (_r *NNServer.N
 	return &resp, nil
 }
 
-//GetUser
-// func (this *Greeter) GetUser(ctx context.Context, uid int32) (r *Sample.Response, err error) {
-// 	return &Sample.Response{ErrCode: 1, ErrMsg: "user not exist."}, nil
-// }
-
 func main() {
 	//命令行参数
 	flag.Usage = Usage
@@ -115,6 +149,7 @@ func main() {
 
 	//handler
 	handler := &ClientServer{}
+	handler.initConf()
 
 	//transport,no secure
 	var err error
