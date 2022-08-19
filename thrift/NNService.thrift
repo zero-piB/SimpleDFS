@@ -1,6 +1,5 @@
-namespace go NameNode
+namespace go NNServer
 include "File.thrift"
-include "DNService.thrift"
 include "Msg.thrift"
 
 
@@ -25,7 +24,7 @@ service ClientServer {
     Msg.Resp DeleteFile(1: string Path)
     Msg.Resp RenameFile(1: string oldName, 2: string newName)
     Msg.Resp Mkdir(1: string path)
-    File.Node List(1: string path)
+    Node List(1: string path)
 
 }
 

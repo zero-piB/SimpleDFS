@@ -1,5 +1,6 @@
 
-namespace go NameNode
+namespace go NNServer
+namespace go DNServer
 
 //1. 文件的元信息，参考Unix文件信息
 struct File {
