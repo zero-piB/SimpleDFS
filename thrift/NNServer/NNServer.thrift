@@ -32,9 +32,8 @@ service Server {
     //1.给client提供的服务
     list<ChunkInfo> PutFile(1: File.File remoteFile)
     Msg.Resp PutFileOk(1: File.File file, 2: list<ChunkInfo> chunks)
-    
-    list<ChunkInfo> GetFile(1: File.File remoteFile)
-    File.File Stat(1:File.File remoteFile)
+    list<ChunkInfo> GetFile(1: string path)
+    File.File Stat(1:string path)
     Msg.Resp DeleteFile(1: string Path)
     Msg.Resp RenameFile(1: string oldName, 2: string newName)
     Msg.Resp Mkdir(1: string path)

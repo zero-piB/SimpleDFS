@@ -6,5 +6,5 @@ include "Msg.thrift"
 //DN提供的服务
 service Server {
     Msg.Resp putChunk(1: Chunk.Chunk chunk)
-    Msg.Resp getChunk(1: string id)
+    Chunk.Chunk getChunk(1: string id)
 }
