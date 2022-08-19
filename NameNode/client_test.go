@@ -3,7 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"sample/go/Sample"
+	"namenode/DNServer"
+	"namenode/NNServer"
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -11,7 +12,7 @@ import (
 
 var ctx = context.Background()
 
-func GetClient(addr string) *Sample.GreeterClient {
+func GetClient(addr string) *NNServer.ClientServerClient {
 	var transport thrift.TTransport
 	var err error
 	transport, err = thrift.NewTSocket(addr)
@@ -39,7 +40,7 @@ func GetClient(addr string) *Sample.GreeterClient {
 	iprot := protocolFactory.GetProtocol(transport)
 	oprot := protocolFactory.GetProtocol(transport)
 
-	client := Sample.NewGreeterClient(thrift.NewTStandardClient(iprot, oprot))
+	client := NNServer.NewClientServerClient(thrift.NewTStandardClient(iprot, oprot))
 	return client
 }
 
@@ -51,11 +52,11 @@ func TestSayHello(t *testing.T) {
 	// 	SocketTimeout:  time.Second, // Use 0 for no timeout
 	// }
 	client := GetClient(addr)
-	user := &Sample.User{}
-	user.Name = "thrift"
-	user.Address = "address"
+	file := &DNServer.File{}
+	file.FileName = "thrift"
+	file.Size = 23
 
-	rep, err := client.SayHello(ctx, user)
+	rep, err := client.Stat(ctx, file)
 	if err != nil {
 		t.Errorf("thrift err: %v\n", err)
 	} else {

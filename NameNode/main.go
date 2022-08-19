@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
+	"namenode/DNServer"
+	"namenode/NNServer"
 	"os"
-	"sample/go/Sample"
 
 	"github.com/apache/thrift/lib/go/thrift"
 )
@@ -18,20 +18,60 @@ func Usage() {
 }
 
 //定义服务
-type Greeter struct {
+type ClientServer struct {
 }
 
 //实现IDL里定义的接口
-//SayHello
-func (this *Greeter) SayHello(ctx context.Context, u *Sample.User) (r *Sample.Response, err error) {
-	strJson, _ := json.Marshal(u)
-	return &Sample.Response{ErrCode: 0, ErrMsg: "success", Data: map[string]string{"User": string(strJson)}}, nil
+func (this *ClientServer) PutFile(ctx context.Context, remoteFile *DNServer.File) (_r []*NNServer.ChunkInfo, _err error) {
+	return make([]*NNServer.ChunkInfo, 0), nil
+}
+func (this *ClientServer) GetFile(ctx context.Context, remoteFile *DNServer.File) (_r []*NNServer.ChunkInfo, _err error) {
+	return make([]*NNServer.ChunkInfo, 0), nil
+}
+
+// Parameters:
+//  - RemoteFile
+func (this *ClientServer) Stat(ctx context.Context, remoteFile *DNServer.File) (_r *DNServer.File, _err error) {
+	file := &DNServer.File{
+		FileName: "asdf",
+		Size:     12312,
+	}
+	return file, nil
+}
+
+// Parameters:
+//  - Path
+func (this *ClientServer) DeleteFile(ctx context.Context, Path string) (_r *DNServer.Resp, _err error) {
+	resp := DNServer.Resp{}
+	return &resp, nil
+}
+
+// Parameters:
+//  - OldName
+//  - NewName_
+func (this *ClientServer) RenameFile(ctx context.Context, oldName string, newName string) (_r *DNServer.Resp, _err error) {
+	resp := DNServer.Resp{}
+	return &resp, nil
+}
+
+// Parameters:
+//  - Path
+func (this *ClientServer) Mkdir(ctx context.Context, path string) (_r *DNServer.Resp, _err error) {
+	resp := DNServer.Resp{}
+	return &resp, nil
+}
+
+// Parameters:
+//  - Path
+func (this *ClientServer) List(ctx context.Context, path string) (_r *NNServer.Node, _err error) {
+	resp := NNServer.Node{}
+	return &resp, nil
 }
 
 //GetUser
-func (this *Greeter) GetUser(ctx context.Context, uid int32) (r *Sample.Response, err error) {
-	return &Sample.Response{ErrCode: 1, ErrMsg: "user not exist."}, nil
-}
+// func (this *Greeter) GetUser(ctx context.Context, uid int32) (r *Sample.Response, err error) {
+// 	return &Sample.Response{ErrCode: 1, ErrMsg: "user not exist."}, nil
+// }
 
 func main() {
 	//命令行参数
@@ -74,7 +114,7 @@ func main() {
 	}
 
 	//handler
-	handler := &Greeter{}
+	handler := &ClientServer{}
 
 	//transport,no secure
 	var err error
@@ -85,7 +125,7 @@ func main() {
 	}
 
 	//processor
-	processor := Sample.NewGreeterProcessor(handler)
+	processor := NNServer.NewClientServerProcessor(handler)
 
 	fmt.Println("Starting the simple server... on ", *addr)
 
