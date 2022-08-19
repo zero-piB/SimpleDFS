@@ -1,12 +1,8 @@
 namespace go NameNode
 include "File.thrift"
+include "DNService.thrift"
 include "Msg.thrift"
 
-struct FileResp {
-    1: required i32 errCode; 
-    2: required string errMsg; 
-    3: File.FileChunks FileInfo; 
-}
 
 //1. Node Unix文件系统的信息，是目录的逻辑结构的结点信息, 用于List接口
 struct Node {
@@ -14,18 +10,27 @@ struct Node {
     2: bool isDir;
 }
 
-//1.给client提供的服务
-service ClientServer {
-    FileResp PutFile(1: File.File remoteFile)
-    FileResp GetFile(1: File.File remoteFile)
-    string Stat(1:File.File remoteFile)
-    Msg.Resp DeleteFile(1: File.File remoteFile)
-    Msg.Resp RenameFile(1: File.File remoteFile)
-    Msg.Resp Mkdir(1: string path)
-    NNFile.Node List(1: string path)
+//chunk存放所在的位置信息
+struct ChunkInfo {
+    1: string id;
+    2: string addr;
+    3: string port;
 }
 
-//2. 给datanode提供的服务
+//2.给client提供的服务
+service ClientServer {
+    list<ChunkInfo> PutFile(1: File.File remoteFile)
+    list<ChunkInfo> GetFile(1: File.File remoteFile)
+    File.File Stat(1:File.File remoteFile)
+    Msg.Resp DeleteFile(1: string Path)
+    Msg.Resp RenameFile(1: string oldName, 2: string newName)
+    Msg.Resp Mkdir(1: string path)
+    File.Node List(1: string path)
+
+}
+
+//3. 给datanode提供的服务
 service DNService {
     
+
 }

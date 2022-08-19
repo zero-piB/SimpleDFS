@@ -12,6 +12,8 @@ struct DN {
     5: i64 StorageAvail;
 }
 
+//1.给Client提供的服务
 service ClientServer {
-    
+    Msg.Resp putChunk(1: File.Chunk chunk)
+    Msg.Resp getChunk(1: string id)
 }

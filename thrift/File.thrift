@@ -7,7 +7,6 @@ struct File {
     2: required i32 size;
 }
 
-
 //2. 文件存放的基本单元
 struct Chunk {
     1: string id;
