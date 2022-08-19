@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 	thrift "github.com/apache/thrift/lib/go/thrift"
-	"namenode/DNServer"
-
 )
 
 // (needed to ensure safety because of naive import list construction.)
@@ -19,7 +17,6 @@ var _ = context.Background
 var _ = time.Now
 var _ = bytes.Equal
 
-var _ = DNServer.GoUnusedProtection__
 
 func init() {
 }

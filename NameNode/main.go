@@ -5,9 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"namenode/DNServer"
 	"namenode/NNServer"
 	"os"
+	"sync"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	uuid "github.com/satori/go.uuid"
@@ -22,32 +22,33 @@ func Usage() {
 type DN struct {
 	addr         string
 	port         string
-	name         string
+	id           int
 	StorageTotal int
 	StorageAvail int
 }
 
 //定义服务
-type ClientServer struct {
+type Server struct {
 	chunkSize int //每个chunk的大小：KB
-	DNlist    []*DN
+
+	//1.可用DataNode的列表
+	dn_lock sync.Locker
+	DNlist  []*DN
 }
 
-func (this *ClientServer) initConf() {
+func (this *Server) initConf() {
 	this.chunkSize = 128
 }
-func min(a int, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
 
-//实现IDL里定义的接口
-func (this *ClientServer) PutFile(ctx context.Context, remoteFile *DNServer.File) (_r []*NNServer.ChunkInfo, _err error) {
+//putFile
+func (this *Server) PutFile(ctx context.Context, remoteFile *NNServer.File) (_r []*NNServer.ChunkInfo, _err error) {
 	avail_chunks := make([]*NNServer.ChunkInfo, 0)
-
+	avail_id := make([]int, 0)
 	needSize := int(remoteFile.Size)
+
+	this.dn_lock.Lock()
+	defer this.dn_lock.Unlock()
+
 	for i := 0; i < len(this.DNlist); i++ {
 		n := min(needSize, int(this.chunkSize))
 		if n > 0 && this.DNlist[i].StorageAvail >= n {
@@ -56,22 +57,28 @@ func (this *ClientServer) PutFile(ctx context.Context, remoteFile *DNServer.File
 				Addr: this.DNlist[i].addr,
 				Port: this.DNlist[i].port,
 			})
+			avail_id = append(avail_id, this.DNlist[i].id)
 		}
 	}
 	if needSize > 0 {
-		return make([]*NNServer.ChunkInfo, 0), errors.New("Not Enough Space")
+		return make([]*NNServer.ChunkInfo, 0), errors.New("has not enough space")
 	}
-
+	//avail_id会减去已经分配的空间
 	return avail_chunks, nil
 }
-func (this *ClientServer) GetFile(ctx context.Context, remoteFile *DNServer.File) (_r []*NNServer.ChunkInfo, _err error) {
+
+func (this *Server) PutFileOk(ctx context.Context, file *NNServer.File, chunks []*NNServer.ChunkInfo) (_r *NNServer.Resp, _err error) {
+	resp := NNServer.Resp{}
+	return &resp, nil
+}
+func (this *Server) GetFile(ctx context.Context, remoteFile *NNServer.File) (_r []*NNServer.ChunkInfo, _err error) {
 	return make([]*NNServer.ChunkInfo, 0), nil
 }
 
 // Parameters:
 //  - RemoteFile
-func (this *ClientServer) Stat(ctx context.Context, remoteFile *DNServer.File) (_r *DNServer.File, _err error) {
-	file := &DNServer.File{
+func (this *Server) Stat(ctx context.Context, remoteFile *NNServer.File) (_r *NNServer.File, _err error) {
+	file := &NNServer.File{
 		FileName: "asdf",
 		Size:     12312,
 	}
@@ -80,33 +87,39 @@ func (this *ClientServer) Stat(ctx context.Context, remoteFile *DNServer.File) (
 
 // Parameters:
 //  - Path
-func (this *ClientServer) DeleteFile(ctx context.Context, Path string) (_r *DNServer.Resp, _err error) {
-	resp := DNServer.Resp{}
+func (this *Server) DeleteFile(ctx context.Context, Path string) (_r *NNServer.Resp, _err error) {
+	resp := NNServer.Resp{}
 	return &resp, nil
 }
 
 // Parameters:
 //  - OldName
 //  - NewName_
-func (this *ClientServer) RenameFile(ctx context.Context, oldName string, newName string) (_r *DNServer.Resp, _err error) {
-	resp := DNServer.Resp{}
+func (this *Server) RenameFile(ctx context.Context, oldName string, newName string) (_r *NNServer.Resp, _err error) {
+	resp := NNServer.Resp{}
 	return &resp, nil
 }
 
 // Parameters:
 //  - Path
-func (this *ClientServer) Mkdir(ctx context.Context, path string) (_r *DNServer.Resp, _err error) {
-	resp := DNServer.Resp{}
+func (this *Server) Mkdir(ctx context.Context, path string) (_r *NNServer.Resp, _err error) {
+	resp := NNServer.Resp{}
 	return &resp, nil
 }
 
 // Parameters:
 //  - Path
-func (this *ClientServer) List(ctx context.Context, path string) (_r *NNServer.Node, _err error) {
+func (this *Server) List(ctx context.Context, path string) (_r *NNServer.Node, _err error) {
 	resp := NNServer.Node{}
 	return &resp, nil
 }
 
+//DN server
+func (this *Server) Register(ctx context.Context, dninfo *NNServer.DN) (_r *NNServer.Resp, _err error) {
+	fmt.Println(dninfo)
+	resp := NNServer.Resp{}
+	return &resp, nil
+}
 func main() {
 	//命令行参数
 	flag.Usage = Usage
@@ -148,7 +161,7 @@ func main() {
 	}
 
 	//handler
-	handler := &ClientServer{}
+	handler := &Server{}
 	handler.initConf()
 
 	//transport,no secure
@@ -159,13 +172,14 @@ func main() {
 		fmt.Println("error running server:", err)
 	}
 
-	//processor
-	processor := NNServer.NewClientServerProcessor(handler)
+	//client processor
+	clientProcessor := NNServer.NewServerProcessor(handler)
+	// processor2 := NNServer.NewDNServiceProcessor()
 
-	fmt.Println("Starting the simple server... on ", *addr)
+	fmt.Println("Starting the namenode server... on ", *addr)
 
 	//start tcp server
-	server := thrift.NewTSimpleServer4(processor, transport, transportFactory, protocolFactory)
+	server := thrift.NewTSimpleServer4(clientProcessor, transport, transportFactory, protocolFactory)
 	err = server.Serve()
 
 	if err != nil {

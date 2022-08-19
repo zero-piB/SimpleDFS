@@ -1,5 +1,4 @@
 namespace go NNServer
-namespace go DNServer
 //rpc 报文的基本信息
 
 struct Resp {

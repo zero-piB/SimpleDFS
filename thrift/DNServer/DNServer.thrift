@@ -1,4 +1,4 @@
-namespace go DataNode
+namespace go DNServer
 
 include "File.thrift"
 include "Msg.thrift"

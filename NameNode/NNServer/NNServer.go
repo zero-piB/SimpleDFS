@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 	thrift "github.com/apache/thrift/lib/go/thrift"
-	"namenode/DNServer"
 
 )
 
@@ -19,7 +18,6 @@ var _ = context.Background
 var _ = time.Now
 var _ = bytes.Equal
 
-var _ = DNServer.GoUnusedProtection__
 // Attributes:
 //  - Name
 //  - IsDir
@@ -162,10 +160,14 @@ func (p *Node) String() string {
 //  - ID
 //  - Addr
 //  - Port
+//  - DnId
+//  - ChunkSize
 type ChunkInfo struct {
   ID string `thrift:"id,1" db:"id" json:"id"`
   Addr string `thrift:"addr,2" db:"addr" json:"addr"`
   Port string `thrift:"port,3" db:"port" json:"port"`
+  DnId int32 `thrift:"dnId,4" db:"dnId" json:"dnId"`
+  ChunkSize int32 `thrift:"chunkSize,5" db:"chunkSize" json:"chunkSize"`
 }
 
 func NewChunkInfo() *ChunkInfo {
@@ -183,6 +185,14 @@ func (p *ChunkInfo) GetAddr() string {
 
 func (p *ChunkInfo) GetPort() string {
   return p.Port
+}
+
+func (p *ChunkInfo) GetDnId() int32 {
+  return p.DnId
+}
+
+func (p *ChunkInfo) GetChunkSize() int32 {
+  return p.ChunkSize
 }
 func (p *ChunkInfo) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
@@ -220,6 +230,26 @@ func (p *ChunkInfo) Read(ctx context.Context, iprot thrift.TProtocol) error {
     case 3:
       if fieldTypeId == thrift.STRING {
         if err := p.ReadField3(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 4:
+      if fieldTypeId == thrift.I32 {
+        if err := p.ReadField4(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 5:
+      if fieldTypeId == thrift.I32 {
+        if err := p.ReadField5(ctx, iprot); err != nil {
           return err
         }
       } else {
@@ -269,6 +299,24 @@ func (p *ChunkInfo)  ReadField3(ctx context.Context, iprot thrift.TProtocol) err
   return nil
 }
 
+func (p *ChunkInfo)  ReadField4(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadI32(ctx); err != nil {
+  return thrift.PrependError("error reading field 4: ", err)
+} else {
+  p.DnId = v
+}
+  return nil
+}
+
+func (p *ChunkInfo)  ReadField5(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadI32(ctx); err != nil {
+  return thrift.PrependError("error reading field 5: ", err)
+} else {
+  p.ChunkSize = v
+}
+  return nil
+}
+
 func (p *ChunkInfo) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "ChunkInfo"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
@@ -276,6 +324,8 @@ func (p *ChunkInfo) Write(ctx context.Context, oprot thrift.TProtocol) error {
     if err := p.writeField1(ctx, oprot); err != nil { return err }
     if err := p.writeField2(ctx, oprot); err != nil { return err }
     if err := p.writeField3(ctx, oprot); err != nil { return err }
+    if err := p.writeField4(ctx, oprot); err != nil { return err }
+    if err := p.writeField5(ctx, oprot); err != nil { return err }
   }
   if err := oprot.WriteFieldStop(ctx); err != nil {
     return thrift.PrependError("write field stop error: ", err) }
@@ -314,6 +364,26 @@ func (p *ChunkInfo) writeField3(ctx context.Context, oprot thrift.TProtocol) (er
   return err
 }
 
+func (p *ChunkInfo) writeField4(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "dnId", thrift.I32, 4); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 4:dnId: ", p), err) }
+  if err := oprot.WriteI32(ctx, int32(p.DnId)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.dnId (4) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 4:dnId: ", p), err) }
+  return err
+}
+
+func (p *ChunkInfo) writeField5(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "chunkSize", thrift.I32, 5); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 5:chunkSize: ", p), err) }
+  if err := oprot.WriteI32(ctx, int32(p.ChunkSize)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.chunkSize (5) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 5:chunkSize: ", p), err) }
+  return err
+}
+
 func (p *ChunkInfo) Equals(other *ChunkInfo) bool {
   if p == other {
     return true
@@ -323,6 +393,8 @@ func (p *ChunkInfo) Equals(other *ChunkInfo) bool {
   if p.ID != other.ID { return false }
   if p.Addr != other.Addr { return false }
   if p.Port != other.Port { return false }
+  if p.DnId != other.DnId { return false }
+  if p.ChunkSize != other.ChunkSize { return false }
   return true
 }
 
@@ -333,72 +405,328 @@ func (p *ChunkInfo) String() string {
   return fmt.Sprintf("ChunkInfo(%+v)", *p)
 }
 
-type ClientServer interface {
+// Attributes:
+//  - IP
+//  - Port
+//  - Name
+//  - StorageTotal
+//  - StorageAvail
+type DN struct {
+  IP string `thrift:"ip,1" db:"ip" json:"ip"`
+  Port string `thrift:"port,2" db:"port" json:"port"`
+  Name string `thrift:"name,3" db:"name" json:"name"`
+  StorageTotal int64 `thrift:"StorageTotal,4" db:"StorageTotal" json:"StorageTotal"`
+  StorageAvail int64 `thrift:"StorageAvail,5" db:"StorageAvail" json:"StorageAvail"`
+}
+
+func NewDN() *DN {
+  return &DN{}
+}
+
+
+func (p *DN) GetIP() string {
+  return p.IP
+}
+
+func (p *DN) GetPort() string {
+  return p.Port
+}
+
+func (p *DN) GetName() string {
+  return p.Name
+}
+
+func (p *DN) GetStorageTotal() int64 {
+  return p.StorageTotal
+}
+
+func (p *DN) GetStorageAvail() int64 {
+  return p.StorageAvail
+}
+func (p *DN) Read(ctx context.Context, iprot thrift.TProtocol) error {
+  if _, err := iprot.ReadStructBegin(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
+  }
+
+
+  for {
+    _, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
+    if err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+    }
+    if fieldTypeId == thrift.STOP { break; }
+    switch fieldId {
+    case 1:
+      if fieldTypeId == thrift.STRING {
+        if err := p.ReadField1(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 2:
+      if fieldTypeId == thrift.STRING {
+        if err := p.ReadField2(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 3:
+      if fieldTypeId == thrift.STRING {
+        if err := p.ReadField3(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 4:
+      if fieldTypeId == thrift.I64 {
+        if err := p.ReadField4(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 5:
+      if fieldTypeId == thrift.I64 {
+        if err := p.ReadField5(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    default:
+      if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+        return err
+      }
+    }
+    if err := iprot.ReadFieldEnd(ctx); err != nil {
+      return err
+    }
+  }
+  if err := iprot.ReadStructEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+  }
+  return nil
+}
+
+func (p *DN)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadString(ctx); err != nil {
+  return thrift.PrependError("error reading field 1: ", err)
+} else {
+  p.IP = v
+}
+  return nil
+}
+
+func (p *DN)  ReadField2(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadString(ctx); err != nil {
+  return thrift.PrependError("error reading field 2: ", err)
+} else {
+  p.Port = v
+}
+  return nil
+}
+
+func (p *DN)  ReadField3(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadString(ctx); err != nil {
+  return thrift.PrependError("error reading field 3: ", err)
+} else {
+  p.Name = v
+}
+  return nil
+}
+
+func (p *DN)  ReadField4(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadI64(ctx); err != nil {
+  return thrift.PrependError("error reading field 4: ", err)
+} else {
+  p.StorageTotal = v
+}
+  return nil
+}
+
+func (p *DN)  ReadField5(ctx context.Context, iprot thrift.TProtocol) error {
+  if v, err := iprot.ReadI64(ctx); err != nil {
+  return thrift.PrependError("error reading field 5: ", err)
+} else {
+  p.StorageAvail = v
+}
+  return nil
+}
+
+func (p *DN) Write(ctx context.Context, oprot thrift.TProtocol) error {
+  if err := oprot.WriteStructBegin(ctx, "DN"); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
+  if p != nil {
+    if err := p.writeField1(ctx, oprot); err != nil { return err }
+    if err := p.writeField2(ctx, oprot); err != nil { return err }
+    if err := p.writeField3(ctx, oprot); err != nil { return err }
+    if err := p.writeField4(ctx, oprot); err != nil { return err }
+    if err := p.writeField5(ctx, oprot); err != nil { return err }
+  }
+  if err := oprot.WriteFieldStop(ctx); err != nil {
+    return thrift.PrependError("write field stop error: ", err) }
+  if err := oprot.WriteStructEnd(ctx); err != nil {
+    return thrift.PrependError("write struct stop error: ", err) }
+  return nil
+}
+
+func (p *DN) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "ip", thrift.STRING, 1); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:ip: ", p), err) }
+  if err := oprot.WriteString(ctx, string(p.IP)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.ip (1) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 1:ip: ", p), err) }
+  return err
+}
+
+func (p *DN) writeField2(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "port", thrift.STRING, 2); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 2:port: ", p), err) }
+  if err := oprot.WriteString(ctx, string(p.Port)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.port (2) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 2:port: ", p), err) }
+  return err
+}
+
+func (p *DN) writeField3(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "name", thrift.STRING, 3); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 3:name: ", p), err) }
+  if err := oprot.WriteString(ctx, string(p.Name)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.name (3) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 3:name: ", p), err) }
+  return err
+}
+
+func (p *DN) writeField4(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "StorageTotal", thrift.I64, 4); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 4:StorageTotal: ", p), err) }
+  if err := oprot.WriteI64(ctx, int64(p.StorageTotal)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.StorageTotal (4) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 4:StorageTotal: ", p), err) }
+  return err
+}
+
+func (p *DN) writeField5(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "StorageAvail", thrift.I64, 5); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 5:StorageAvail: ", p), err) }
+  if err := oprot.WriteI64(ctx, int64(p.StorageAvail)); err != nil {
+  return thrift.PrependError(fmt.Sprintf("%T.StorageAvail (5) field write error: ", p), err) }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 5:StorageAvail: ", p), err) }
+  return err
+}
+
+func (p *DN) Equals(other *DN) bool {
+  if p == other {
+    return true
+  } else if p == nil || other == nil {
+    return false
+  }
+  if p.IP != other.IP { return false }
+  if p.Port != other.Port { return false }
+  if p.Name != other.Name { return false }
+  if p.StorageTotal != other.StorageTotal { return false }
+  if p.StorageAvail != other.StorageAvail { return false }
+  return true
+}
+
+func (p *DN) String() string {
+  if p == nil {
+    return "<nil>"
+  }
+  return fmt.Sprintf("DN(%+v)", *p)
+}
+
+type Server interface {
   // Parameters:
   //  - RemoteFile
-  PutFile(ctx context.Context, remoteFile *DNServer.File) (_r []*ChunkInfo, _err error)
+  PutFile(ctx context.Context, remoteFile *File) (_r []*ChunkInfo, _err error)
+  // Parameters:
+  //  - File
+  //  - Chunks
+  PutFileOk(ctx context.Context, file *File, chunks []*ChunkInfo) (_r *Resp, _err error)
   // Parameters:
   //  - RemoteFile
-  GetFile(ctx context.Context, remoteFile *DNServer.File) (_r []*ChunkInfo, _err error)
+  GetFile(ctx context.Context, remoteFile *File) (_r []*ChunkInfo, _err error)
   // Parameters:
   //  - RemoteFile
-  Stat(ctx context.Context, remoteFile *DNServer.File) (_r *DNServer.File, _err error)
+  Stat(ctx context.Context, remoteFile *File) (_r *File, _err error)
   // Parameters:
   //  - Path
-  DeleteFile(ctx context.Context, Path string) (_r *DNServer.Resp, _err error)
+  DeleteFile(ctx context.Context, Path string) (_r *Resp, _err error)
   // Parameters:
   //  - OldName
   //  - NewName_
-  RenameFile(ctx context.Context, oldName string, newName string) (_r *DNServer.Resp, _err error)
+  RenameFile(ctx context.Context, oldName string, newName string) (_r *Resp, _err error)
   // Parameters:
   //  - Path
-  Mkdir(ctx context.Context, path string) (_r *DNServer.Resp, _err error)
+  Mkdir(ctx context.Context, path string) (_r *Resp, _err error)
   // Parameters:
   //  - Path
   List(ctx context.Context, path string) (_r *Node, _err error)
+  // Parameters:
+  //  - Dninfo
+  Register(ctx context.Context, dninfo *DN) (_r *Resp, _err error)
 }
 
-type ClientServerClient struct {
+type ServerClient struct {
   c thrift.TClient
   meta thrift.ResponseMeta
 }
 
-func NewClientServerClientFactory(t thrift.TTransport, f thrift.TProtocolFactory) *ClientServerClient {
-  return &ClientServerClient{
+func NewServerClientFactory(t thrift.TTransport, f thrift.TProtocolFactory) *ServerClient {
+  return &ServerClient{
     c: thrift.NewTStandardClient(f.GetProtocol(t), f.GetProtocol(t)),
   }
 }
 
-func NewClientServerClientProtocol(t thrift.TTransport, iprot thrift.TProtocol, oprot thrift.TProtocol) *ClientServerClient {
-  return &ClientServerClient{
+func NewServerClientProtocol(t thrift.TTransport, iprot thrift.TProtocol, oprot thrift.TProtocol) *ServerClient {
+  return &ServerClient{
     c: thrift.NewTStandardClient(iprot, oprot),
   }
 }
 
-func NewClientServerClient(c thrift.TClient) *ClientServerClient {
-  return &ClientServerClient{
+func NewServerClient(c thrift.TClient) *ServerClient {
+  return &ServerClient{
     c: c,
   }
 }
 
-func (p *ClientServerClient) Client_() thrift.TClient {
+func (p *ServerClient) Client_() thrift.TClient {
   return p.c
 }
 
-func (p *ClientServerClient) LastResponseMeta_() thrift.ResponseMeta {
+func (p *ServerClient) LastResponseMeta_() thrift.ResponseMeta {
   return p.meta
 }
 
-func (p *ClientServerClient) SetLastResponseMeta_(meta thrift.ResponseMeta) {
+func (p *ServerClient) SetLastResponseMeta_(meta thrift.ResponseMeta) {
   p.meta = meta
 }
 
 // Parameters:
 //  - RemoteFile
-func (p *ClientServerClient) PutFile(ctx context.Context, remoteFile *DNServer.File) (_r []*ChunkInfo, _err error) {
-  var _args0 ClientServerPutFileArgs
+func (p *ServerClient) PutFile(ctx context.Context, remoteFile *File) (_r []*ChunkInfo, _err error) {
+  var _args0 ServerPutFileArgs
   _args0.RemoteFile = remoteFile
-  var _result2 ClientServerPutFileResult
+  var _result2 ServerPutFileResult
   var _meta1 thrift.ResponseMeta
   _meta1, _err = p.Client_().Call(ctx, "PutFile", &_args0, &_result2)
   p.SetLastResponseMeta_(_meta1)
@@ -409,46 +737,48 @@ func (p *ClientServerClient) PutFile(ctx context.Context, remoteFile *DNServer.F
 }
 
 // Parameters:
-//  - RemoteFile
-func (p *ClientServerClient) GetFile(ctx context.Context, remoteFile *DNServer.File) (_r []*ChunkInfo, _err error) {
-  var _args3 ClientServerGetFileArgs
-  _args3.RemoteFile = remoteFile
-  var _result5 ClientServerGetFileResult
+//  - File
+//  - Chunks
+func (p *ServerClient) PutFileOk(ctx context.Context, file *File, chunks []*ChunkInfo) (_r *Resp, _err error) {
+  var _args3 ServerPutFileOkArgs
+  _args3.File = file
+  _args3.Chunks = chunks
+  var _result5 ServerPutFileOkResult
   var _meta4 thrift.ResponseMeta
-  _meta4, _err = p.Client_().Call(ctx, "GetFile", &_args3, &_result5)
+  _meta4, _err = p.Client_().Call(ctx, "PutFileOk", &_args3, &_result5)
   p.SetLastResponseMeta_(_meta4)
   if _err != nil {
     return
   }
-  return _result5.GetSuccess(), nil
+  if _ret6 := _result5.GetSuccess(); _ret6 != nil {
+    return _ret6, nil
+  }
+  return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "PutFileOk failed: unknown result")
 }
 
 // Parameters:
 //  - RemoteFile
-func (p *ClientServerClient) Stat(ctx context.Context, remoteFile *DNServer.File) (_r *DNServer.File, _err error) {
-  var _args6 ClientServerStatArgs
-  _args6.RemoteFile = remoteFile
-  var _result8 ClientServerStatResult
-  var _meta7 thrift.ResponseMeta
-  _meta7, _err = p.Client_().Call(ctx, "Stat", &_args6, &_result8)
-  p.SetLastResponseMeta_(_meta7)
+func (p *ServerClient) GetFile(ctx context.Context, remoteFile *File) (_r []*ChunkInfo, _err error) {
+  var _args7 ServerGetFileArgs
+  _args7.RemoteFile = remoteFile
+  var _result9 ServerGetFileResult
+  var _meta8 thrift.ResponseMeta
+  _meta8, _err = p.Client_().Call(ctx, "GetFile", &_args7, &_result9)
+  p.SetLastResponseMeta_(_meta8)
   if _err != nil {
     return
   }
-  if _ret9 := _result8.GetSuccess(); _ret9 != nil {
-    return _ret9, nil
-  }
-  return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "Stat failed: unknown result")
+  return _result9.GetSuccess(), nil
 }
 
 // Parameters:
-//  - Path
-func (p *ClientServerClient) DeleteFile(ctx context.Context, Path string) (_r *DNServer.Resp, _err error) {
-  var _args10 ClientServerDeleteFileArgs
-  _args10.Path = Path
-  var _result12 ClientServerDeleteFileResult
+//  - RemoteFile
+func (p *ServerClient) Stat(ctx context.Context, remoteFile *File) (_r *File, _err error) {
+  var _args10 ServerStatArgs
+  _args10.RemoteFile = remoteFile
+  var _result12 ServerStatResult
   var _meta11 thrift.ResponseMeta
-  _meta11, _err = p.Client_().Call(ctx, "DeleteFile", &_args10, &_result12)
+  _meta11, _err = p.Client_().Call(ctx, "Stat", &_args10, &_result12)
   p.SetLastResponseMeta_(_meta11)
   if _err != nil {
     return
@@ -456,19 +786,17 @@ func (p *ClientServerClient) DeleteFile(ctx context.Context, Path string) (_r *D
   if _ret13 := _result12.GetSuccess(); _ret13 != nil {
     return _ret13, nil
   }
-  return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "DeleteFile failed: unknown result")
+  return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "Stat failed: unknown result")
 }
 
 // Parameters:
-//  - OldName
-//  - NewName_
-func (p *ClientServerClient) RenameFile(ctx context.Context, oldName string, newName string) (_r *DNServer.Resp, _err error) {
-  var _args14 ClientServerRenameFileArgs
-  _args14.OldName = oldName
-  _args14.NewName_ = newName
-  var _result16 ClientServerRenameFileResult
+//  - Path
+func (p *ServerClient) DeleteFile(ctx context.Context, Path string) (_r *Resp, _err error) {
+  var _args14 ServerDeleteFileArgs
+  _args14.Path = Path
+  var _result16 ServerDeleteFileResult
   var _meta15 thrift.ResponseMeta
-  _meta15, _err = p.Client_().Call(ctx, "RenameFile", &_args14, &_result16)
+  _meta15, _err = p.Client_().Call(ctx, "DeleteFile", &_args14, &_result16)
   p.SetLastResponseMeta_(_meta15)
   if _err != nil {
     return
@@ -476,17 +804,19 @@ func (p *ClientServerClient) RenameFile(ctx context.Context, oldName string, new
   if _ret17 := _result16.GetSuccess(); _ret17 != nil {
     return _ret17, nil
   }
-  return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "RenameFile failed: unknown result")
+  return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "DeleteFile failed: unknown result")
 }
 
 // Parameters:
-//  - Path
-func (p *ClientServerClient) Mkdir(ctx context.Context, path string) (_r *DNServer.Resp, _err error) {
-  var _args18 ClientServerMkdirArgs
-  _args18.Path = path
-  var _result20 ClientServerMkdirResult
+//  - OldName
+//  - NewName_
+func (p *ServerClient) RenameFile(ctx context.Context, oldName string, newName string) (_r *Resp, _err error) {
+  var _args18 ServerRenameFileArgs
+  _args18.OldName = oldName
+  _args18.NewName_ = newName
+  var _result20 ServerRenameFileResult
   var _meta19 thrift.ResponseMeta
-  _meta19, _err = p.Client_().Call(ctx, "Mkdir", &_args18, &_result20)
+  _meta19, _err = p.Client_().Call(ctx, "RenameFile", &_args18, &_result20)
   p.SetLastResponseMeta_(_meta19)
   if _err != nil {
     return
@@ -494,17 +824,17 @@ func (p *ClientServerClient) Mkdir(ctx context.Context, path string) (_r *DNServ
   if _ret21 := _result20.GetSuccess(); _ret21 != nil {
     return _ret21, nil
   }
-  return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "Mkdir failed: unknown result")
+  return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "RenameFile failed: unknown result")
 }
 
 // Parameters:
 //  - Path
-func (p *ClientServerClient) List(ctx context.Context, path string) (_r *Node, _err error) {
-  var _args22 ClientServerListArgs
+func (p *ServerClient) Mkdir(ctx context.Context, path string) (_r *Resp, _err error) {
+  var _args22 ServerMkdirArgs
   _args22.Path = path
-  var _result24 ClientServerListResult
+  var _result24 ServerMkdirResult
   var _meta23 thrift.ResponseMeta
-  _meta23, _err = p.Client_().Call(ctx, "List", &_args22, &_result24)
+  _meta23, _err = p.Client_().Call(ctx, "Mkdir", &_args22, &_result24)
   p.SetLastResponseMeta_(_meta23)
   if _err != nil {
     return
@@ -512,41 +842,79 @@ func (p *ClientServerClient) List(ctx context.Context, path string) (_r *Node, _
   if _ret25 := _result24.GetSuccess(); _ret25 != nil {
     return _ret25, nil
   }
+  return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "Mkdir failed: unknown result")
+}
+
+// Parameters:
+//  - Path
+func (p *ServerClient) List(ctx context.Context, path string) (_r *Node, _err error) {
+  var _args26 ServerListArgs
+  _args26.Path = path
+  var _result28 ServerListResult
+  var _meta27 thrift.ResponseMeta
+  _meta27, _err = p.Client_().Call(ctx, "List", &_args26, &_result28)
+  p.SetLastResponseMeta_(_meta27)
+  if _err != nil {
+    return
+  }
+  if _ret29 := _result28.GetSuccess(); _ret29 != nil {
+    return _ret29, nil
+  }
   return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "List failed: unknown result")
 }
 
-type ClientServerProcessor struct {
-  processorMap map[string]thrift.TProcessorFunction
-  handler ClientServer
+// Parameters:
+//  - Dninfo
+func (p *ServerClient) Register(ctx context.Context, dninfo *DN) (_r *Resp, _err error) {
+  var _args30 ServerRegisterArgs
+  _args30.Dninfo = dninfo
+  var _result32 ServerRegisterResult
+  var _meta31 thrift.ResponseMeta
+  _meta31, _err = p.Client_().Call(ctx, "Register", &_args30, &_result32)
+  p.SetLastResponseMeta_(_meta31)
+  if _err != nil {
+    return
+  }
+  if _ret33 := _result32.GetSuccess(); _ret33 != nil {
+    return _ret33, nil
+  }
+  return nil, thrift.NewTApplicationException(thrift.MISSING_RESULT, "Register failed: unknown result")
 }
 
-func (p *ClientServerProcessor) AddToProcessorMap(key string, processor thrift.TProcessorFunction) {
+type ServerProcessor struct {
+  processorMap map[string]thrift.TProcessorFunction
+  handler Server
+}
+
+func (p *ServerProcessor) AddToProcessorMap(key string, processor thrift.TProcessorFunction) {
   p.processorMap[key] = processor
 }
 
-func (p *ClientServerProcessor) GetProcessorFunction(key string) (processor thrift.TProcessorFunction, ok bool) {
+func (p *ServerProcessor) GetProcessorFunction(key string) (processor thrift.TProcessorFunction, ok bool) {
   processor, ok = p.processorMap[key]
   return processor, ok
 }
 
-func (p *ClientServerProcessor) ProcessorMap() map[string]thrift.TProcessorFunction {
+func (p *ServerProcessor) ProcessorMap() map[string]thrift.TProcessorFunction {
   return p.processorMap
 }
 
-func NewClientServerProcessor(handler ClientServer) *ClientServerProcessor {
+func NewServerProcessor(handler Server) *ServerProcessor {
 
-  self26 := &ClientServerProcessor{handler:handler, processorMap:make(map[string]thrift.TProcessorFunction)}
-  self26.processorMap["PutFile"] = &clientServerProcessorPutFile{handler:handler}
-  self26.processorMap["GetFile"] = &clientServerProcessorGetFile{handler:handler}
-  self26.processorMap["Stat"] = &clientServerProcessorStat{handler:handler}
-  self26.processorMap["DeleteFile"] = &clientServerProcessorDeleteFile{handler:handler}
-  self26.processorMap["RenameFile"] = &clientServerProcessorRenameFile{handler:handler}
-  self26.processorMap["Mkdir"] = &clientServerProcessorMkdir{handler:handler}
-  self26.processorMap["List"] = &clientServerProcessorList{handler:handler}
-return self26
+  self34 := &ServerProcessor{handler:handler, processorMap:make(map[string]thrift.TProcessorFunction)}
+  self34.processorMap["PutFile"] = &serverProcessorPutFile{handler:handler}
+  self34.processorMap["PutFileOk"] = &serverProcessorPutFileOk{handler:handler}
+  self34.processorMap["GetFile"] = &serverProcessorGetFile{handler:handler}
+  self34.processorMap["Stat"] = &serverProcessorStat{handler:handler}
+  self34.processorMap["DeleteFile"] = &serverProcessorDeleteFile{handler:handler}
+  self34.processorMap["RenameFile"] = &serverProcessorRenameFile{handler:handler}
+  self34.processorMap["Mkdir"] = &serverProcessorMkdir{handler:handler}
+  self34.processorMap["List"] = &serverProcessorList{handler:handler}
+  self34.processorMap["Register"] = &serverProcessorRegister{handler:handler}
+return self34
 }
 
-func (p *ClientServerProcessor) Process(ctx context.Context, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+func (p *ServerProcessor) Process(ctx context.Context, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
   name, _, seqId, err2 := iprot.ReadMessageBegin(ctx)
   if err2 != nil { return false, thrift.WrapTException(err2) }
   if processor, ok := p.GetProcessorFunction(name); ok {
@@ -554,21 +922,21 @@ func (p *ClientServerProcessor) Process(ctx context.Context, iprot, oprot thrift
   }
   iprot.Skip(ctx, thrift.STRUCT)
   iprot.ReadMessageEnd(ctx)
-  x27 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function " + name)
+  x35 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function " + name)
   oprot.WriteMessageBegin(ctx, name, thrift.EXCEPTION, seqId)
-  x27.Write(ctx, oprot)
+  x35.Write(ctx, oprot)
   oprot.WriteMessageEnd(ctx)
   oprot.Flush(ctx)
-  return false, x27
+  return false, x35
 
 }
 
-type clientServerProcessorPutFile struct {
-  handler ClientServer
+type serverProcessorPutFile struct {
+  handler Server
 }
 
-func (p *clientServerProcessorPutFile) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-  args := ClientServerPutFileArgs{}
+func (p *serverProcessorPutFile) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+  args := ServerPutFileArgs{}
   var err2 error
   if err2 = args.Read(ctx, iprot); err2 != nil {
     iprot.ReadMessageEnd(ctx)
@@ -607,7 +975,7 @@ func (p *clientServerProcessorPutFile) Process(ctx context.Context, seqId int32,
     }(tickerCtx, cancel)
   }
 
-  result := ClientServerPutFileResult{}
+  result := ServerPutFileResult{}
   var retval []*ChunkInfo
   if retval, err2 = p.handler.PutFile(ctx, args.RemoteFile); err2 != nil {
     tickerCancel()
@@ -642,12 +1010,91 @@ func (p *clientServerProcessorPutFile) Process(ctx context.Context, seqId int32,
   return true, err
 }
 
-type clientServerProcessorGetFile struct {
-  handler ClientServer
+type serverProcessorPutFileOk struct {
+  handler Server
 }
 
-func (p *clientServerProcessorGetFile) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-  args := ClientServerGetFileArgs{}
+func (p *serverProcessorPutFileOk) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+  args := ServerPutFileOkArgs{}
+  var err2 error
+  if err2 = args.Read(ctx, iprot); err2 != nil {
+    iprot.ReadMessageEnd(ctx)
+    x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err2.Error())
+    oprot.WriteMessageBegin(ctx, "PutFileOk", thrift.EXCEPTION, seqId)
+    x.Write(ctx, oprot)
+    oprot.WriteMessageEnd(ctx)
+    oprot.Flush(ctx)
+    return false, thrift.WrapTException(err2)
+  }
+  iprot.ReadMessageEnd(ctx)
+
+  tickerCancel := func() {}
+  // Start a goroutine to do server side connectivity check.
+  if thrift.ServerConnectivityCheckInterval > 0 {
+    var cancel context.CancelFunc
+    ctx, cancel = context.WithCancel(ctx)
+    defer cancel()
+    var tickerCtx context.Context
+    tickerCtx, tickerCancel = context.WithCancel(context.Background())
+    defer tickerCancel()
+    go func(ctx context.Context, cancel context.CancelFunc) {
+      ticker := time.NewTicker(thrift.ServerConnectivityCheckInterval)
+      defer ticker.Stop()
+      for {
+        select {
+        case <-ctx.Done():
+          return
+        case <-ticker.C:
+          if !iprot.Transport().IsOpen() {
+            cancel()
+            return
+          }
+        }
+      }
+    }(tickerCtx, cancel)
+  }
+
+  result := ServerPutFileOkResult{}
+  var retval *Resp
+  if retval, err2 = p.handler.PutFileOk(ctx, args.File, args.Chunks); err2 != nil {
+    tickerCancel()
+    if err2 == thrift.ErrAbandonRequest {
+      return false, thrift.WrapTException(err2)
+    }
+    x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing PutFileOk: " + err2.Error())
+    oprot.WriteMessageBegin(ctx, "PutFileOk", thrift.EXCEPTION, seqId)
+    x.Write(ctx, oprot)
+    oprot.WriteMessageEnd(ctx)
+    oprot.Flush(ctx)
+    return true, thrift.WrapTException(err2)
+  } else {
+    result.Success = retval
+  }
+  tickerCancel()
+  if err2 = oprot.WriteMessageBegin(ctx, "PutFileOk", thrift.REPLY, seqId); err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err2 = result.Write(ctx, oprot); err == nil && err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err2 = oprot.WriteMessageEnd(ctx); err == nil && err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err2 = oprot.Flush(ctx); err == nil && err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err != nil {
+    return
+  }
+  return true, err
+}
+
+type serverProcessorGetFile struct {
+  handler Server
+}
+
+func (p *serverProcessorGetFile) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+  args := ServerGetFileArgs{}
   var err2 error
   if err2 = args.Read(ctx, iprot); err2 != nil {
     iprot.ReadMessageEnd(ctx)
@@ -686,7 +1133,7 @@ func (p *clientServerProcessorGetFile) Process(ctx context.Context, seqId int32,
     }(tickerCtx, cancel)
   }
 
-  result := ClientServerGetFileResult{}
+  result := ServerGetFileResult{}
   var retval []*ChunkInfo
   if retval, err2 = p.handler.GetFile(ctx, args.RemoteFile); err2 != nil {
     tickerCancel()
@@ -721,12 +1168,12 @@ func (p *clientServerProcessorGetFile) Process(ctx context.Context, seqId int32,
   return true, err
 }
 
-type clientServerProcessorStat struct {
-  handler ClientServer
+type serverProcessorStat struct {
+  handler Server
 }
 
-func (p *clientServerProcessorStat) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-  args := ClientServerStatArgs{}
+func (p *serverProcessorStat) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+  args := ServerStatArgs{}
   var err2 error
   if err2 = args.Read(ctx, iprot); err2 != nil {
     iprot.ReadMessageEnd(ctx)
@@ -765,8 +1212,8 @@ func (p *clientServerProcessorStat) Process(ctx context.Context, seqId int32, ip
     }(tickerCtx, cancel)
   }
 
-  result := ClientServerStatResult{}
-  var retval *DNServer.File
+  result := ServerStatResult{}
+  var retval *File
   if retval, err2 = p.handler.Stat(ctx, args.RemoteFile); err2 != nil {
     tickerCancel()
     if err2 == thrift.ErrAbandonRequest {
@@ -800,12 +1247,12 @@ func (p *clientServerProcessorStat) Process(ctx context.Context, seqId int32, ip
   return true, err
 }
 
-type clientServerProcessorDeleteFile struct {
-  handler ClientServer
+type serverProcessorDeleteFile struct {
+  handler Server
 }
 
-func (p *clientServerProcessorDeleteFile) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-  args := ClientServerDeleteFileArgs{}
+func (p *serverProcessorDeleteFile) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+  args := ServerDeleteFileArgs{}
   var err2 error
   if err2 = args.Read(ctx, iprot); err2 != nil {
     iprot.ReadMessageEnd(ctx)
@@ -844,8 +1291,8 @@ func (p *clientServerProcessorDeleteFile) Process(ctx context.Context, seqId int
     }(tickerCtx, cancel)
   }
 
-  result := ClientServerDeleteFileResult{}
-  var retval *DNServer.Resp
+  result := ServerDeleteFileResult{}
+  var retval *Resp
   if retval, err2 = p.handler.DeleteFile(ctx, args.Path); err2 != nil {
     tickerCancel()
     if err2 == thrift.ErrAbandonRequest {
@@ -879,12 +1326,12 @@ func (p *clientServerProcessorDeleteFile) Process(ctx context.Context, seqId int
   return true, err
 }
 
-type clientServerProcessorRenameFile struct {
-  handler ClientServer
+type serverProcessorRenameFile struct {
+  handler Server
 }
 
-func (p *clientServerProcessorRenameFile) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-  args := ClientServerRenameFileArgs{}
+func (p *serverProcessorRenameFile) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+  args := ServerRenameFileArgs{}
   var err2 error
   if err2 = args.Read(ctx, iprot); err2 != nil {
     iprot.ReadMessageEnd(ctx)
@@ -923,8 +1370,8 @@ func (p *clientServerProcessorRenameFile) Process(ctx context.Context, seqId int
     }(tickerCtx, cancel)
   }
 
-  result := ClientServerRenameFileResult{}
-  var retval *DNServer.Resp
+  result := ServerRenameFileResult{}
+  var retval *Resp
   if retval, err2 = p.handler.RenameFile(ctx, args.OldName, args.NewName_); err2 != nil {
     tickerCancel()
     if err2 == thrift.ErrAbandonRequest {
@@ -958,12 +1405,12 @@ func (p *clientServerProcessorRenameFile) Process(ctx context.Context, seqId int
   return true, err
 }
 
-type clientServerProcessorMkdir struct {
-  handler ClientServer
+type serverProcessorMkdir struct {
+  handler Server
 }
 
-func (p *clientServerProcessorMkdir) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-  args := ClientServerMkdirArgs{}
+func (p *serverProcessorMkdir) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+  args := ServerMkdirArgs{}
   var err2 error
   if err2 = args.Read(ctx, iprot); err2 != nil {
     iprot.ReadMessageEnd(ctx)
@@ -1002,8 +1449,8 @@ func (p *clientServerProcessorMkdir) Process(ctx context.Context, seqId int32, i
     }(tickerCtx, cancel)
   }
 
-  result := ClientServerMkdirResult{}
-  var retval *DNServer.Resp
+  result := ServerMkdirResult{}
+  var retval *Resp
   if retval, err2 = p.handler.Mkdir(ctx, args.Path); err2 != nil {
     tickerCancel()
     if err2 == thrift.ErrAbandonRequest {
@@ -1037,12 +1484,12 @@ func (p *clientServerProcessorMkdir) Process(ctx context.Context, seqId int32, i
   return true, err
 }
 
-type clientServerProcessorList struct {
-  handler ClientServer
+type serverProcessorList struct {
+  handler Server
 }
 
-func (p *clientServerProcessorList) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-  args := ClientServerListArgs{}
+func (p *serverProcessorList) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+  args := ServerListArgs{}
   var err2 error
   if err2 = args.Read(ctx, iprot); err2 != nil {
     iprot.ReadMessageEnd(ctx)
@@ -1081,7 +1528,7 @@ func (p *clientServerProcessorList) Process(ctx context.Context, seqId int32, ip
     }(tickerCtx, cancel)
   }
 
-  result := ClientServerListResult{}
+  result := ServerListResult{}
   var retval *Node
   if retval, err2 = p.handler.List(ctx, args.Path); err2 != nil {
     tickerCancel()
@@ -1116,31 +1563,110 @@ func (p *clientServerProcessorList) Process(ctx context.Context, seqId int32, ip
   return true, err
 }
 
+type serverProcessorRegister struct {
+  handler Server
+}
+
+func (p *serverProcessorRegister) Process(ctx context.Context, seqId int32, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
+  args := ServerRegisterArgs{}
+  var err2 error
+  if err2 = args.Read(ctx, iprot); err2 != nil {
+    iprot.ReadMessageEnd(ctx)
+    x := thrift.NewTApplicationException(thrift.PROTOCOL_ERROR, err2.Error())
+    oprot.WriteMessageBegin(ctx, "Register", thrift.EXCEPTION, seqId)
+    x.Write(ctx, oprot)
+    oprot.WriteMessageEnd(ctx)
+    oprot.Flush(ctx)
+    return false, thrift.WrapTException(err2)
+  }
+  iprot.ReadMessageEnd(ctx)
+
+  tickerCancel := func() {}
+  // Start a goroutine to do server side connectivity check.
+  if thrift.ServerConnectivityCheckInterval > 0 {
+    var cancel context.CancelFunc
+    ctx, cancel = context.WithCancel(ctx)
+    defer cancel()
+    var tickerCtx context.Context
+    tickerCtx, tickerCancel = context.WithCancel(context.Background())
+    defer tickerCancel()
+    go func(ctx context.Context, cancel context.CancelFunc) {
+      ticker := time.NewTicker(thrift.ServerConnectivityCheckInterval)
+      defer ticker.Stop()
+      for {
+        select {
+        case <-ctx.Done():
+          return
+        case <-ticker.C:
+          if !iprot.Transport().IsOpen() {
+            cancel()
+            return
+          }
+        }
+      }
+    }(tickerCtx, cancel)
+  }
+
+  result := ServerRegisterResult{}
+  var retval *Resp
+  if retval, err2 = p.handler.Register(ctx, args.Dninfo); err2 != nil {
+    tickerCancel()
+    if err2 == thrift.ErrAbandonRequest {
+      return false, thrift.WrapTException(err2)
+    }
+    x := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, "Internal error processing Register: " + err2.Error())
+    oprot.WriteMessageBegin(ctx, "Register", thrift.EXCEPTION, seqId)
+    x.Write(ctx, oprot)
+    oprot.WriteMessageEnd(ctx)
+    oprot.Flush(ctx)
+    return true, thrift.WrapTException(err2)
+  } else {
+    result.Success = retval
+  }
+  tickerCancel()
+  if err2 = oprot.WriteMessageBegin(ctx, "Register", thrift.REPLY, seqId); err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err2 = result.Write(ctx, oprot); err == nil && err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err2 = oprot.WriteMessageEnd(ctx); err == nil && err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err2 = oprot.Flush(ctx); err == nil && err2 != nil {
+    err = thrift.WrapTException(err2)
+  }
+  if err != nil {
+    return
+  }
+  return true, err
+}
+
 
 // HELPER FUNCTIONS AND STRUCTURES
 
 // Attributes:
 //  - RemoteFile
-type ClientServerPutFileArgs struct {
-  RemoteFile *DNServer.File `thrift:"remoteFile,1" db:"remoteFile" json:"remoteFile"`
+type ServerPutFileArgs struct {
+  RemoteFile *File `thrift:"remoteFile,1" db:"remoteFile" json:"remoteFile"`
 }
 
-func NewClientServerPutFileArgs() *ClientServerPutFileArgs {
-  return &ClientServerPutFileArgs{}
+func NewServerPutFileArgs() *ServerPutFileArgs {
+  return &ServerPutFileArgs{}
 }
 
-var ClientServerPutFileArgs_RemoteFile_DEFAULT *DNServer.File
-func (p *ClientServerPutFileArgs) GetRemoteFile() *DNServer.File {
+var ServerPutFileArgs_RemoteFile_DEFAULT *File
+func (p *ServerPutFileArgs) GetRemoteFile() *File {
   if !p.IsSetRemoteFile() {
-    return ClientServerPutFileArgs_RemoteFile_DEFAULT
+    return ServerPutFileArgs_RemoteFile_DEFAULT
   }
 return p.RemoteFile
 }
-func (p *ClientServerPutFileArgs) IsSetRemoteFile() bool {
+func (p *ServerPutFileArgs) IsSetRemoteFile() bool {
   return p.RemoteFile != nil
 }
 
-func (p *ClientServerPutFileArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerPutFileArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -1178,15 +1704,15 @@ func (p *ClientServerPutFileArgs) Read(ctx context.Context, iprot thrift.TProtoc
   return nil
 }
 
-func (p *ClientServerPutFileArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
-  p.RemoteFile = &DNServer.File{}
+func (p *ServerPutFileArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
+  p.RemoteFile = &File{}
   if err := p.RemoteFile.Read(ctx, iprot); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.RemoteFile), err)
   }
   return nil
 }
 
-func (p *ClientServerPutFileArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerPutFileArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "PutFile_args"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -1199,7 +1725,7 @@ func (p *ClientServerPutFileArgs) Write(ctx context.Context, oprot thrift.TProto
   return nil
 }
 
-func (p *ClientServerPutFileArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerPutFileArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if err := oprot.WriteFieldBegin(ctx, "remoteFile", thrift.STRUCT, 1); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:remoteFile: ", p), err) }
   if err := p.RemoteFile.Write(ctx, oprot); err != nil {
@@ -1210,33 +1736,33 @@ func (p *ClientServerPutFileArgs) writeField1(ctx context.Context, oprot thrift.
   return err
 }
 
-func (p *ClientServerPutFileArgs) String() string {
+func (p *ServerPutFileArgs) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerPutFileArgs(%+v)", *p)
+  return fmt.Sprintf("ServerPutFileArgs(%+v)", *p)
 }
 
 // Attributes:
 //  - Success
-type ClientServerPutFileResult struct {
+type ServerPutFileResult struct {
   Success []*ChunkInfo `thrift:"success,0" db:"success" json:"success,omitempty"`
 }
 
-func NewClientServerPutFileResult() *ClientServerPutFileResult {
-  return &ClientServerPutFileResult{}
+func NewServerPutFileResult() *ServerPutFileResult {
+  return &ServerPutFileResult{}
 }
 
-var ClientServerPutFileResult_Success_DEFAULT []*ChunkInfo
+var ServerPutFileResult_Success_DEFAULT []*ChunkInfo
 
-func (p *ClientServerPutFileResult) GetSuccess() []*ChunkInfo {
+func (p *ServerPutFileResult) GetSuccess() []*ChunkInfo {
   return p.Success
 }
-func (p *ClientServerPutFileResult) IsSetSuccess() bool {
+func (p *ServerPutFileResult) IsSetSuccess() bool {
   return p.Success != nil
 }
 
-func (p *ClientServerPutFileResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerPutFileResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -1274,7 +1800,7 @@ func (p *ClientServerPutFileResult) Read(ctx context.Context, iprot thrift.TProt
   return nil
 }
 
-func (p *ClientServerPutFileResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerPutFileResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
   _, size, err := iprot.ReadListBegin(ctx)
   if err != nil {
     return thrift.PrependError("error reading list begin: ", err)
@@ -1282,11 +1808,11 @@ func (p *ClientServerPutFileResult)  ReadField0(ctx context.Context, iprot thrif
   tSlice := make([]*ChunkInfo, 0, size)
   p.Success =  tSlice
   for i := 0; i < size; i ++ {
-    _elem28 := &ChunkInfo{}
-    if err := _elem28.Read(ctx, iprot); err != nil {
-      return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", _elem28), err)
+    _elem36 := &ChunkInfo{}
+    if err := _elem36.Read(ctx, iprot); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", _elem36), err)
     }
-    p.Success = append(p.Success, _elem28)
+    p.Success = append(p.Success, _elem36)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)
@@ -1294,7 +1820,7 @@ func (p *ClientServerPutFileResult)  ReadField0(ctx context.Context, iprot thrif
   return nil
 }
 
-func (p *ClientServerPutFileResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerPutFileResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "PutFile_result"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -1307,7 +1833,7 @@ func (p *ClientServerPutFileResult) Write(ctx context.Context, oprot thrift.TPro
   return nil
 }
 
-func (p *ClientServerPutFileResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerPutFileResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if p.IsSetSuccess() {
     if err := oprot.WriteFieldBegin(ctx, "success", thrift.LIST, 0); err != nil {
       return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err) }
@@ -1328,35 +1854,289 @@ func (p *ClientServerPutFileResult) writeField0(ctx context.Context, oprot thrif
   return err
 }
 
-func (p *ClientServerPutFileResult) String() string {
+func (p *ServerPutFileResult) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerPutFileResult(%+v)", *p)
+  return fmt.Sprintf("ServerPutFileResult(%+v)", *p)
+}
+
+// Attributes:
+//  - File
+//  - Chunks
+type ServerPutFileOkArgs struct {
+  File *File `thrift:"file,1" db:"file" json:"file"`
+  Chunks []*ChunkInfo `thrift:"chunks,2" db:"chunks" json:"chunks"`
+}
+
+func NewServerPutFileOkArgs() *ServerPutFileOkArgs {
+  return &ServerPutFileOkArgs{}
+}
+
+var ServerPutFileOkArgs_File_DEFAULT *File
+func (p *ServerPutFileOkArgs) GetFile() *File {
+  if !p.IsSetFile() {
+    return ServerPutFileOkArgs_File_DEFAULT
+  }
+return p.File
+}
+
+func (p *ServerPutFileOkArgs) GetChunks() []*ChunkInfo {
+  return p.Chunks
+}
+func (p *ServerPutFileOkArgs) IsSetFile() bool {
+  return p.File != nil
+}
+
+func (p *ServerPutFileOkArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
+  if _, err := iprot.ReadStructBegin(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
+  }
+
+
+  for {
+    _, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
+    if err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+    }
+    if fieldTypeId == thrift.STOP { break; }
+    switch fieldId {
+    case 1:
+      if fieldTypeId == thrift.STRUCT {
+        if err := p.ReadField1(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    case 2:
+      if fieldTypeId == thrift.LIST {
+        if err := p.ReadField2(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    default:
+      if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+        return err
+      }
+    }
+    if err := iprot.ReadFieldEnd(ctx); err != nil {
+      return err
+    }
+  }
+  if err := iprot.ReadStructEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+  }
+  return nil
+}
+
+func (p *ServerPutFileOkArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
+  p.File = &File{}
+  if err := p.File.Read(ctx, iprot); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.File), err)
+  }
+  return nil
+}
+
+func (p *ServerPutFileOkArgs)  ReadField2(ctx context.Context, iprot thrift.TProtocol) error {
+  _, size, err := iprot.ReadListBegin(ctx)
+  if err != nil {
+    return thrift.PrependError("error reading list begin: ", err)
+  }
+  tSlice := make([]*ChunkInfo, 0, size)
+  p.Chunks =  tSlice
+  for i := 0; i < size; i ++ {
+    _elem37 := &ChunkInfo{}
+    if err := _elem37.Read(ctx, iprot); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", _elem37), err)
+    }
+    p.Chunks = append(p.Chunks, _elem37)
+  }
+  if err := iprot.ReadListEnd(ctx); err != nil {
+    return thrift.PrependError("error reading list end: ", err)
+  }
+  return nil
+}
+
+func (p *ServerPutFileOkArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
+  if err := oprot.WriteStructBegin(ctx, "PutFileOk_args"); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
+  if p != nil {
+    if err := p.writeField1(ctx, oprot); err != nil { return err }
+    if err := p.writeField2(ctx, oprot); err != nil { return err }
+  }
+  if err := oprot.WriteFieldStop(ctx); err != nil {
+    return thrift.PrependError("write field stop error: ", err) }
+  if err := oprot.WriteStructEnd(ctx); err != nil {
+    return thrift.PrependError("write struct stop error: ", err) }
+  return nil
+}
+
+func (p *ServerPutFileOkArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "file", thrift.STRUCT, 1); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:file: ", p), err) }
+  if err := p.File.Write(ctx, oprot); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.File), err)
+  }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 1:file: ", p), err) }
+  return err
+}
+
+func (p *ServerPutFileOkArgs) writeField2(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "chunks", thrift.LIST, 2); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 2:chunks: ", p), err) }
+  if err := oprot.WriteListBegin(ctx, thrift.STRUCT, len(p.Chunks)); err != nil {
+    return thrift.PrependError("error writing list begin: ", err)
+  }
+  for _, v := range p.Chunks {
+    if err := v.Write(ctx, oprot); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", v), err)
+    }
+  }
+  if err := oprot.WriteListEnd(ctx); err != nil {
+    return thrift.PrependError("error writing list end: ", err)
+  }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 2:chunks: ", p), err) }
+  return err
+}
+
+func (p *ServerPutFileOkArgs) String() string {
+  if p == nil {
+    return "<nil>"
+  }
+  return fmt.Sprintf("ServerPutFileOkArgs(%+v)", *p)
+}
+
+// Attributes:
+//  - Success
+type ServerPutFileOkResult struct {
+  Success *Resp `thrift:"success,0" db:"success" json:"success,omitempty"`
+}
+
+func NewServerPutFileOkResult() *ServerPutFileOkResult {
+  return &ServerPutFileOkResult{}
+}
+
+var ServerPutFileOkResult_Success_DEFAULT *Resp
+func (p *ServerPutFileOkResult) GetSuccess() *Resp {
+  if !p.IsSetSuccess() {
+    return ServerPutFileOkResult_Success_DEFAULT
+  }
+return p.Success
+}
+func (p *ServerPutFileOkResult) IsSetSuccess() bool {
+  return p.Success != nil
+}
+
+func (p *ServerPutFileOkResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
+  if _, err := iprot.ReadStructBegin(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
+  }
+
+
+  for {
+    _, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
+    if err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+    }
+    if fieldTypeId == thrift.STOP { break; }
+    switch fieldId {
+    case 0:
+      if fieldTypeId == thrift.STRUCT {
+        if err := p.ReadField0(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    default:
+      if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+        return err
+      }
+    }
+    if err := iprot.ReadFieldEnd(ctx); err != nil {
+      return err
+    }
+  }
+  if err := iprot.ReadStructEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+  }
+  return nil
+}
+
+func (p *ServerPutFileOkResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
+  p.Success = &Resp{}
+  if err := p.Success.Read(ctx, iprot); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Success), err)
+  }
+  return nil
+}
+
+func (p *ServerPutFileOkResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
+  if err := oprot.WriteStructBegin(ctx, "PutFileOk_result"); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
+  if p != nil {
+    if err := p.writeField0(ctx, oprot); err != nil { return err }
+  }
+  if err := oprot.WriteFieldStop(ctx); err != nil {
+    return thrift.PrependError("write field stop error: ", err) }
+  if err := oprot.WriteStructEnd(ctx); err != nil {
+    return thrift.PrependError("write struct stop error: ", err) }
+  return nil
+}
+
+func (p *ServerPutFileOkResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if p.IsSetSuccess() {
+    if err := oprot.WriteFieldBegin(ctx, "success", thrift.STRUCT, 0); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err) }
+    if err := p.Success.Write(ctx, oprot); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.Success), err)
+    }
+    if err := oprot.WriteFieldEnd(ctx); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T write field end error 0:success: ", p), err) }
+  }
+  return err
+}
+
+func (p *ServerPutFileOkResult) String() string {
+  if p == nil {
+    return "<nil>"
+  }
+  return fmt.Sprintf("ServerPutFileOkResult(%+v)", *p)
 }
 
 // Attributes:
 //  - RemoteFile
-type ClientServerGetFileArgs struct {
-  RemoteFile *DNServer.File `thrift:"remoteFile,1" db:"remoteFile" json:"remoteFile"`
+type ServerGetFileArgs struct {
+  RemoteFile *File `thrift:"remoteFile,1" db:"remoteFile" json:"remoteFile"`
 }
 
-func NewClientServerGetFileArgs() *ClientServerGetFileArgs {
-  return &ClientServerGetFileArgs{}
+func NewServerGetFileArgs() *ServerGetFileArgs {
+  return &ServerGetFileArgs{}
 }
 
-var ClientServerGetFileArgs_RemoteFile_DEFAULT *DNServer.File
-func (p *ClientServerGetFileArgs) GetRemoteFile() *DNServer.File {
+var ServerGetFileArgs_RemoteFile_DEFAULT *File
+func (p *ServerGetFileArgs) GetRemoteFile() *File {
   if !p.IsSetRemoteFile() {
-    return ClientServerGetFileArgs_RemoteFile_DEFAULT
+    return ServerGetFileArgs_RemoteFile_DEFAULT
   }
 return p.RemoteFile
 }
-func (p *ClientServerGetFileArgs) IsSetRemoteFile() bool {
+func (p *ServerGetFileArgs) IsSetRemoteFile() bool {
   return p.RemoteFile != nil
 }
 
-func (p *ClientServerGetFileArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerGetFileArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -1394,15 +2174,15 @@ func (p *ClientServerGetFileArgs) Read(ctx context.Context, iprot thrift.TProtoc
   return nil
 }
 
-func (p *ClientServerGetFileArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
-  p.RemoteFile = &DNServer.File{}
+func (p *ServerGetFileArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
+  p.RemoteFile = &File{}
   if err := p.RemoteFile.Read(ctx, iprot); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.RemoteFile), err)
   }
   return nil
 }
 
-func (p *ClientServerGetFileArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerGetFileArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "GetFile_args"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -1415,7 +2195,7 @@ func (p *ClientServerGetFileArgs) Write(ctx context.Context, oprot thrift.TProto
   return nil
 }
 
-func (p *ClientServerGetFileArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerGetFileArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if err := oprot.WriteFieldBegin(ctx, "remoteFile", thrift.STRUCT, 1); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:remoteFile: ", p), err) }
   if err := p.RemoteFile.Write(ctx, oprot); err != nil {
@@ -1426,33 +2206,33 @@ func (p *ClientServerGetFileArgs) writeField1(ctx context.Context, oprot thrift.
   return err
 }
 
-func (p *ClientServerGetFileArgs) String() string {
+func (p *ServerGetFileArgs) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerGetFileArgs(%+v)", *p)
+  return fmt.Sprintf("ServerGetFileArgs(%+v)", *p)
 }
 
 // Attributes:
 //  - Success
-type ClientServerGetFileResult struct {
+type ServerGetFileResult struct {
   Success []*ChunkInfo `thrift:"success,0" db:"success" json:"success,omitempty"`
 }
 
-func NewClientServerGetFileResult() *ClientServerGetFileResult {
-  return &ClientServerGetFileResult{}
+func NewServerGetFileResult() *ServerGetFileResult {
+  return &ServerGetFileResult{}
 }
 
-var ClientServerGetFileResult_Success_DEFAULT []*ChunkInfo
+var ServerGetFileResult_Success_DEFAULT []*ChunkInfo
 
-func (p *ClientServerGetFileResult) GetSuccess() []*ChunkInfo {
+func (p *ServerGetFileResult) GetSuccess() []*ChunkInfo {
   return p.Success
 }
-func (p *ClientServerGetFileResult) IsSetSuccess() bool {
+func (p *ServerGetFileResult) IsSetSuccess() bool {
   return p.Success != nil
 }
 
-func (p *ClientServerGetFileResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerGetFileResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -1490,7 +2270,7 @@ func (p *ClientServerGetFileResult) Read(ctx context.Context, iprot thrift.TProt
   return nil
 }
 
-func (p *ClientServerGetFileResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerGetFileResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
   _, size, err := iprot.ReadListBegin(ctx)
   if err != nil {
     return thrift.PrependError("error reading list begin: ", err)
@@ -1498,11 +2278,11 @@ func (p *ClientServerGetFileResult)  ReadField0(ctx context.Context, iprot thrif
   tSlice := make([]*ChunkInfo, 0, size)
   p.Success =  tSlice
   for i := 0; i < size; i ++ {
-    _elem29 := &ChunkInfo{}
-    if err := _elem29.Read(ctx, iprot); err != nil {
-      return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", _elem29), err)
+    _elem38 := &ChunkInfo{}
+    if err := _elem38.Read(ctx, iprot); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", _elem38), err)
     }
-    p.Success = append(p.Success, _elem29)
+    p.Success = append(p.Success, _elem38)
   }
   if err := iprot.ReadListEnd(ctx); err != nil {
     return thrift.PrependError("error reading list end: ", err)
@@ -1510,7 +2290,7 @@ func (p *ClientServerGetFileResult)  ReadField0(ctx context.Context, iprot thrif
   return nil
 }
 
-func (p *ClientServerGetFileResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerGetFileResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "GetFile_result"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -1523,7 +2303,7 @@ func (p *ClientServerGetFileResult) Write(ctx context.Context, oprot thrift.TPro
   return nil
 }
 
-func (p *ClientServerGetFileResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerGetFileResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if p.IsSetSuccess() {
     if err := oprot.WriteFieldBegin(ctx, "success", thrift.LIST, 0); err != nil {
       return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err) }
@@ -1544,35 +2324,35 @@ func (p *ClientServerGetFileResult) writeField0(ctx context.Context, oprot thrif
   return err
 }
 
-func (p *ClientServerGetFileResult) String() string {
+func (p *ServerGetFileResult) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerGetFileResult(%+v)", *p)
+  return fmt.Sprintf("ServerGetFileResult(%+v)", *p)
 }
 
 // Attributes:
 //  - RemoteFile
-type ClientServerStatArgs struct {
-  RemoteFile *DNServer.File `thrift:"remoteFile,1" db:"remoteFile" json:"remoteFile"`
+type ServerStatArgs struct {
+  RemoteFile *File `thrift:"remoteFile,1" db:"remoteFile" json:"remoteFile"`
 }
 
-func NewClientServerStatArgs() *ClientServerStatArgs {
-  return &ClientServerStatArgs{}
+func NewServerStatArgs() *ServerStatArgs {
+  return &ServerStatArgs{}
 }
 
-var ClientServerStatArgs_RemoteFile_DEFAULT *DNServer.File
-func (p *ClientServerStatArgs) GetRemoteFile() *DNServer.File {
+var ServerStatArgs_RemoteFile_DEFAULT *File
+func (p *ServerStatArgs) GetRemoteFile() *File {
   if !p.IsSetRemoteFile() {
-    return ClientServerStatArgs_RemoteFile_DEFAULT
+    return ServerStatArgs_RemoteFile_DEFAULT
   }
 return p.RemoteFile
 }
-func (p *ClientServerStatArgs) IsSetRemoteFile() bool {
+func (p *ServerStatArgs) IsSetRemoteFile() bool {
   return p.RemoteFile != nil
 }
 
-func (p *ClientServerStatArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerStatArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -1610,15 +2390,15 @@ func (p *ClientServerStatArgs) Read(ctx context.Context, iprot thrift.TProtocol)
   return nil
 }
 
-func (p *ClientServerStatArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
-  p.RemoteFile = &DNServer.File{}
+func (p *ServerStatArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
+  p.RemoteFile = &File{}
   if err := p.RemoteFile.Read(ctx, iprot); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.RemoteFile), err)
   }
   return nil
 }
 
-func (p *ClientServerStatArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerStatArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "Stat_args"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -1631,7 +2411,7 @@ func (p *ClientServerStatArgs) Write(ctx context.Context, oprot thrift.TProtocol
   return nil
 }
 
-func (p *ClientServerStatArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerStatArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if err := oprot.WriteFieldBegin(ctx, "remoteFile", thrift.STRUCT, 1); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:remoteFile: ", p), err) }
   if err := p.RemoteFile.Write(ctx, oprot); err != nil {
@@ -1642,35 +2422,35 @@ func (p *ClientServerStatArgs) writeField1(ctx context.Context, oprot thrift.TPr
   return err
 }
 
-func (p *ClientServerStatArgs) String() string {
+func (p *ServerStatArgs) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerStatArgs(%+v)", *p)
+  return fmt.Sprintf("ServerStatArgs(%+v)", *p)
 }
 
 // Attributes:
 //  - Success
-type ClientServerStatResult struct {
-  Success *DNServer.File `thrift:"success,0" db:"success" json:"success,omitempty"`
+type ServerStatResult struct {
+  Success *File `thrift:"success,0" db:"success" json:"success,omitempty"`
 }
 
-func NewClientServerStatResult() *ClientServerStatResult {
-  return &ClientServerStatResult{}
+func NewServerStatResult() *ServerStatResult {
+  return &ServerStatResult{}
 }
 
-var ClientServerStatResult_Success_DEFAULT *DNServer.File
-func (p *ClientServerStatResult) GetSuccess() *DNServer.File {
+var ServerStatResult_Success_DEFAULT *File
+func (p *ServerStatResult) GetSuccess() *File {
   if !p.IsSetSuccess() {
-    return ClientServerStatResult_Success_DEFAULT
+    return ServerStatResult_Success_DEFAULT
   }
 return p.Success
 }
-func (p *ClientServerStatResult) IsSetSuccess() bool {
+func (p *ServerStatResult) IsSetSuccess() bool {
   return p.Success != nil
 }
 
-func (p *ClientServerStatResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerStatResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -1708,15 +2488,15 @@ func (p *ClientServerStatResult) Read(ctx context.Context, iprot thrift.TProtoco
   return nil
 }
 
-func (p *ClientServerStatResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
-  p.Success = &DNServer.File{}
+func (p *ServerStatResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
+  p.Success = &File{}
   if err := p.Success.Read(ctx, iprot); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Success), err)
   }
   return nil
 }
 
-func (p *ClientServerStatResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerStatResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "Stat_result"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -1729,7 +2509,7 @@ func (p *ClientServerStatResult) Write(ctx context.Context, oprot thrift.TProtoc
   return nil
 }
 
-func (p *ClientServerStatResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerStatResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if p.IsSetSuccess() {
     if err := oprot.WriteFieldBegin(ctx, "success", thrift.STRUCT, 0); err != nil {
       return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err) }
@@ -1742,28 +2522,28 @@ func (p *ClientServerStatResult) writeField0(ctx context.Context, oprot thrift.T
   return err
 }
 
-func (p *ClientServerStatResult) String() string {
+func (p *ServerStatResult) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerStatResult(%+v)", *p)
+  return fmt.Sprintf("ServerStatResult(%+v)", *p)
 }
 
 // Attributes:
 //  - Path
-type ClientServerDeleteFileArgs struct {
+type ServerDeleteFileArgs struct {
   Path string `thrift:"Path,1" db:"Path" json:"Path"`
 }
 
-func NewClientServerDeleteFileArgs() *ClientServerDeleteFileArgs {
-  return &ClientServerDeleteFileArgs{}
+func NewServerDeleteFileArgs() *ServerDeleteFileArgs {
+  return &ServerDeleteFileArgs{}
 }
 
 
-func (p *ClientServerDeleteFileArgs) GetPath() string {
+func (p *ServerDeleteFileArgs) GetPath() string {
   return p.Path
 }
-func (p *ClientServerDeleteFileArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerDeleteFileArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -1801,7 +2581,7 @@ func (p *ClientServerDeleteFileArgs) Read(ctx context.Context, iprot thrift.TPro
   return nil
 }
 
-func (p *ClientServerDeleteFileArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerDeleteFileArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
   if v, err := iprot.ReadString(ctx); err != nil {
   return thrift.PrependError("error reading field 1: ", err)
 } else {
@@ -1810,7 +2590,7 @@ func (p *ClientServerDeleteFileArgs)  ReadField1(ctx context.Context, iprot thri
   return nil
 }
 
-func (p *ClientServerDeleteFileArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerDeleteFileArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "DeleteFile_args"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -1823,7 +2603,7 @@ func (p *ClientServerDeleteFileArgs) Write(ctx context.Context, oprot thrift.TPr
   return nil
 }
 
-func (p *ClientServerDeleteFileArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerDeleteFileArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if err := oprot.WriteFieldBegin(ctx, "Path", thrift.STRING, 1); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:Path: ", p), err) }
   if err := oprot.WriteString(ctx, string(p.Path)); err != nil {
@@ -1833,35 +2613,35 @@ func (p *ClientServerDeleteFileArgs) writeField1(ctx context.Context, oprot thri
   return err
 }
 
-func (p *ClientServerDeleteFileArgs) String() string {
+func (p *ServerDeleteFileArgs) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerDeleteFileArgs(%+v)", *p)
+  return fmt.Sprintf("ServerDeleteFileArgs(%+v)", *p)
 }
 
 // Attributes:
 //  - Success
-type ClientServerDeleteFileResult struct {
-  Success *DNServer.Resp `thrift:"success,0" db:"success" json:"success,omitempty"`
+type ServerDeleteFileResult struct {
+  Success *Resp `thrift:"success,0" db:"success" json:"success,omitempty"`
 }
 
-func NewClientServerDeleteFileResult() *ClientServerDeleteFileResult {
-  return &ClientServerDeleteFileResult{}
+func NewServerDeleteFileResult() *ServerDeleteFileResult {
+  return &ServerDeleteFileResult{}
 }
 
-var ClientServerDeleteFileResult_Success_DEFAULT *DNServer.Resp
-func (p *ClientServerDeleteFileResult) GetSuccess() *DNServer.Resp {
+var ServerDeleteFileResult_Success_DEFAULT *Resp
+func (p *ServerDeleteFileResult) GetSuccess() *Resp {
   if !p.IsSetSuccess() {
-    return ClientServerDeleteFileResult_Success_DEFAULT
+    return ServerDeleteFileResult_Success_DEFAULT
   }
 return p.Success
 }
-func (p *ClientServerDeleteFileResult) IsSetSuccess() bool {
+func (p *ServerDeleteFileResult) IsSetSuccess() bool {
   return p.Success != nil
 }
 
-func (p *ClientServerDeleteFileResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerDeleteFileResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -1899,15 +2679,15 @@ func (p *ClientServerDeleteFileResult) Read(ctx context.Context, iprot thrift.TP
   return nil
 }
 
-func (p *ClientServerDeleteFileResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
-  p.Success = &DNServer.Resp{}
+func (p *ServerDeleteFileResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
+  p.Success = &Resp{}
   if err := p.Success.Read(ctx, iprot); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Success), err)
   }
   return nil
 }
 
-func (p *ClientServerDeleteFileResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerDeleteFileResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "DeleteFile_result"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -1920,7 +2700,7 @@ func (p *ClientServerDeleteFileResult) Write(ctx context.Context, oprot thrift.T
   return nil
 }
 
-func (p *ClientServerDeleteFileResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerDeleteFileResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if p.IsSetSuccess() {
     if err := oprot.WriteFieldBegin(ctx, "success", thrift.STRUCT, 0); err != nil {
       return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err) }
@@ -1933,34 +2713,34 @@ func (p *ClientServerDeleteFileResult) writeField0(ctx context.Context, oprot th
   return err
 }
 
-func (p *ClientServerDeleteFileResult) String() string {
+func (p *ServerDeleteFileResult) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerDeleteFileResult(%+v)", *p)
+  return fmt.Sprintf("ServerDeleteFileResult(%+v)", *p)
 }
 
 // Attributes:
 //  - OldName
 //  - NewName_
-type ClientServerRenameFileArgs struct {
+type ServerRenameFileArgs struct {
   OldName string `thrift:"oldName,1" db:"oldName" json:"oldName"`
   NewName_ string `thrift:"newName,2" db:"newName" json:"newName"`
 }
 
-func NewClientServerRenameFileArgs() *ClientServerRenameFileArgs {
-  return &ClientServerRenameFileArgs{}
+func NewServerRenameFileArgs() *ServerRenameFileArgs {
+  return &ServerRenameFileArgs{}
 }
 
 
-func (p *ClientServerRenameFileArgs) GetOldName() string {
+func (p *ServerRenameFileArgs) GetOldName() string {
   return p.OldName
 }
 
-func (p *ClientServerRenameFileArgs) GetNewName_() string {
+func (p *ServerRenameFileArgs) GetNewName_() string {
   return p.NewName_
 }
-func (p *ClientServerRenameFileArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerRenameFileArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -2008,7 +2788,7 @@ func (p *ClientServerRenameFileArgs) Read(ctx context.Context, iprot thrift.TPro
   return nil
 }
 
-func (p *ClientServerRenameFileArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerRenameFileArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
   if v, err := iprot.ReadString(ctx); err != nil {
   return thrift.PrependError("error reading field 1: ", err)
 } else {
@@ -2017,7 +2797,7 @@ func (p *ClientServerRenameFileArgs)  ReadField1(ctx context.Context, iprot thri
   return nil
 }
 
-func (p *ClientServerRenameFileArgs)  ReadField2(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerRenameFileArgs)  ReadField2(ctx context.Context, iprot thrift.TProtocol) error {
   if v, err := iprot.ReadString(ctx); err != nil {
   return thrift.PrependError("error reading field 2: ", err)
 } else {
@@ -2026,7 +2806,7 @@ func (p *ClientServerRenameFileArgs)  ReadField2(ctx context.Context, iprot thri
   return nil
 }
 
-func (p *ClientServerRenameFileArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerRenameFileArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "RenameFile_args"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -2040,7 +2820,7 @@ func (p *ClientServerRenameFileArgs) Write(ctx context.Context, oprot thrift.TPr
   return nil
 }
 
-func (p *ClientServerRenameFileArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerRenameFileArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if err := oprot.WriteFieldBegin(ctx, "oldName", thrift.STRING, 1); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:oldName: ", p), err) }
   if err := oprot.WriteString(ctx, string(p.OldName)); err != nil {
@@ -2050,7 +2830,7 @@ func (p *ClientServerRenameFileArgs) writeField1(ctx context.Context, oprot thri
   return err
 }
 
-func (p *ClientServerRenameFileArgs) writeField2(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerRenameFileArgs) writeField2(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if err := oprot.WriteFieldBegin(ctx, "newName", thrift.STRING, 2); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write field begin error 2:newName: ", p), err) }
   if err := oprot.WriteString(ctx, string(p.NewName_)); err != nil {
@@ -2060,35 +2840,35 @@ func (p *ClientServerRenameFileArgs) writeField2(ctx context.Context, oprot thri
   return err
 }
 
-func (p *ClientServerRenameFileArgs) String() string {
+func (p *ServerRenameFileArgs) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerRenameFileArgs(%+v)", *p)
+  return fmt.Sprintf("ServerRenameFileArgs(%+v)", *p)
 }
 
 // Attributes:
 //  - Success
-type ClientServerRenameFileResult struct {
-  Success *DNServer.Resp `thrift:"success,0" db:"success" json:"success,omitempty"`
+type ServerRenameFileResult struct {
+  Success *Resp `thrift:"success,0" db:"success" json:"success,omitempty"`
 }
 
-func NewClientServerRenameFileResult() *ClientServerRenameFileResult {
-  return &ClientServerRenameFileResult{}
+func NewServerRenameFileResult() *ServerRenameFileResult {
+  return &ServerRenameFileResult{}
 }
 
-var ClientServerRenameFileResult_Success_DEFAULT *DNServer.Resp
-func (p *ClientServerRenameFileResult) GetSuccess() *DNServer.Resp {
+var ServerRenameFileResult_Success_DEFAULT *Resp
+func (p *ServerRenameFileResult) GetSuccess() *Resp {
   if !p.IsSetSuccess() {
-    return ClientServerRenameFileResult_Success_DEFAULT
+    return ServerRenameFileResult_Success_DEFAULT
   }
 return p.Success
 }
-func (p *ClientServerRenameFileResult) IsSetSuccess() bool {
+func (p *ServerRenameFileResult) IsSetSuccess() bool {
   return p.Success != nil
 }
 
-func (p *ClientServerRenameFileResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerRenameFileResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -2126,15 +2906,15 @@ func (p *ClientServerRenameFileResult) Read(ctx context.Context, iprot thrift.TP
   return nil
 }
 
-func (p *ClientServerRenameFileResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
-  p.Success = &DNServer.Resp{}
+func (p *ServerRenameFileResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
+  p.Success = &Resp{}
   if err := p.Success.Read(ctx, iprot); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Success), err)
   }
   return nil
 }
 
-func (p *ClientServerRenameFileResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerRenameFileResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "RenameFile_result"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -2147,7 +2927,7 @@ func (p *ClientServerRenameFileResult) Write(ctx context.Context, oprot thrift.T
   return nil
 }
 
-func (p *ClientServerRenameFileResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerRenameFileResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if p.IsSetSuccess() {
     if err := oprot.WriteFieldBegin(ctx, "success", thrift.STRUCT, 0); err != nil {
       return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err) }
@@ -2160,28 +2940,28 @@ func (p *ClientServerRenameFileResult) writeField0(ctx context.Context, oprot th
   return err
 }
 
-func (p *ClientServerRenameFileResult) String() string {
+func (p *ServerRenameFileResult) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerRenameFileResult(%+v)", *p)
+  return fmt.Sprintf("ServerRenameFileResult(%+v)", *p)
 }
 
 // Attributes:
 //  - Path
-type ClientServerMkdirArgs struct {
+type ServerMkdirArgs struct {
   Path string `thrift:"path,1" db:"path" json:"path"`
 }
 
-func NewClientServerMkdirArgs() *ClientServerMkdirArgs {
-  return &ClientServerMkdirArgs{}
+func NewServerMkdirArgs() *ServerMkdirArgs {
+  return &ServerMkdirArgs{}
 }
 
 
-func (p *ClientServerMkdirArgs) GetPath() string {
+func (p *ServerMkdirArgs) GetPath() string {
   return p.Path
 }
-func (p *ClientServerMkdirArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerMkdirArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -2219,7 +2999,7 @@ func (p *ClientServerMkdirArgs) Read(ctx context.Context, iprot thrift.TProtocol
   return nil
 }
 
-func (p *ClientServerMkdirArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerMkdirArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
   if v, err := iprot.ReadString(ctx); err != nil {
   return thrift.PrependError("error reading field 1: ", err)
 } else {
@@ -2228,7 +3008,7 @@ func (p *ClientServerMkdirArgs)  ReadField1(ctx context.Context, iprot thrift.TP
   return nil
 }
 
-func (p *ClientServerMkdirArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerMkdirArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "Mkdir_args"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -2241,7 +3021,7 @@ func (p *ClientServerMkdirArgs) Write(ctx context.Context, oprot thrift.TProtoco
   return nil
 }
 
-func (p *ClientServerMkdirArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerMkdirArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if err := oprot.WriteFieldBegin(ctx, "path", thrift.STRING, 1); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:path: ", p), err) }
   if err := oprot.WriteString(ctx, string(p.Path)); err != nil {
@@ -2251,35 +3031,35 @@ func (p *ClientServerMkdirArgs) writeField1(ctx context.Context, oprot thrift.TP
   return err
 }
 
-func (p *ClientServerMkdirArgs) String() string {
+func (p *ServerMkdirArgs) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerMkdirArgs(%+v)", *p)
+  return fmt.Sprintf("ServerMkdirArgs(%+v)", *p)
 }
 
 // Attributes:
 //  - Success
-type ClientServerMkdirResult struct {
-  Success *DNServer.Resp `thrift:"success,0" db:"success" json:"success,omitempty"`
+type ServerMkdirResult struct {
+  Success *Resp `thrift:"success,0" db:"success" json:"success,omitempty"`
 }
 
-func NewClientServerMkdirResult() *ClientServerMkdirResult {
-  return &ClientServerMkdirResult{}
+func NewServerMkdirResult() *ServerMkdirResult {
+  return &ServerMkdirResult{}
 }
 
-var ClientServerMkdirResult_Success_DEFAULT *DNServer.Resp
-func (p *ClientServerMkdirResult) GetSuccess() *DNServer.Resp {
+var ServerMkdirResult_Success_DEFAULT *Resp
+func (p *ServerMkdirResult) GetSuccess() *Resp {
   if !p.IsSetSuccess() {
-    return ClientServerMkdirResult_Success_DEFAULT
+    return ServerMkdirResult_Success_DEFAULT
   }
 return p.Success
 }
-func (p *ClientServerMkdirResult) IsSetSuccess() bool {
+func (p *ServerMkdirResult) IsSetSuccess() bool {
   return p.Success != nil
 }
 
-func (p *ClientServerMkdirResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerMkdirResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -2317,15 +3097,15 @@ func (p *ClientServerMkdirResult) Read(ctx context.Context, iprot thrift.TProtoc
   return nil
 }
 
-func (p *ClientServerMkdirResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
-  p.Success = &DNServer.Resp{}
+func (p *ServerMkdirResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
+  p.Success = &Resp{}
   if err := p.Success.Read(ctx, iprot); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Success), err)
   }
   return nil
 }
 
-func (p *ClientServerMkdirResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerMkdirResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "Mkdir_result"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -2338,7 +3118,7 @@ func (p *ClientServerMkdirResult) Write(ctx context.Context, oprot thrift.TProto
   return nil
 }
 
-func (p *ClientServerMkdirResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerMkdirResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if p.IsSetSuccess() {
     if err := oprot.WriteFieldBegin(ctx, "success", thrift.STRUCT, 0); err != nil {
       return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err) }
@@ -2351,28 +3131,28 @@ func (p *ClientServerMkdirResult) writeField0(ctx context.Context, oprot thrift.
   return err
 }
 
-func (p *ClientServerMkdirResult) String() string {
+func (p *ServerMkdirResult) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerMkdirResult(%+v)", *p)
+  return fmt.Sprintf("ServerMkdirResult(%+v)", *p)
 }
 
 // Attributes:
 //  - Path
-type ClientServerListArgs struct {
+type ServerListArgs struct {
   Path string `thrift:"path,1" db:"path" json:"path"`
 }
 
-func NewClientServerListArgs() *ClientServerListArgs {
-  return &ClientServerListArgs{}
+func NewServerListArgs() *ServerListArgs {
+  return &ServerListArgs{}
 }
 
 
-func (p *ClientServerListArgs) GetPath() string {
+func (p *ServerListArgs) GetPath() string {
   return p.Path
 }
-func (p *ClientServerListArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerListArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -2410,7 +3190,7 @@ func (p *ClientServerListArgs) Read(ctx context.Context, iprot thrift.TProtocol)
   return nil
 }
 
-func (p *ClientServerListArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerListArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
   if v, err := iprot.ReadString(ctx); err != nil {
   return thrift.PrependError("error reading field 1: ", err)
 } else {
@@ -2419,7 +3199,7 @@ func (p *ClientServerListArgs)  ReadField1(ctx context.Context, iprot thrift.TPr
   return nil
 }
 
-func (p *ClientServerListArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerListArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "List_args"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -2432,7 +3212,7 @@ func (p *ClientServerListArgs) Write(ctx context.Context, oprot thrift.TProtocol
   return nil
 }
 
-func (p *ClientServerListArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerListArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if err := oprot.WriteFieldBegin(ctx, "path", thrift.STRING, 1); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:path: ", p), err) }
   if err := oprot.WriteString(ctx, string(p.Path)); err != nil {
@@ -2442,35 +3222,35 @@ func (p *ClientServerListArgs) writeField1(ctx context.Context, oprot thrift.TPr
   return err
 }
 
-func (p *ClientServerListArgs) String() string {
+func (p *ServerListArgs) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerListArgs(%+v)", *p)
+  return fmt.Sprintf("ServerListArgs(%+v)", *p)
 }
 
 // Attributes:
 //  - Success
-type ClientServerListResult struct {
+type ServerListResult struct {
   Success *Node `thrift:"success,0" db:"success" json:"success,omitempty"`
 }
 
-func NewClientServerListResult() *ClientServerListResult {
-  return &ClientServerListResult{}
+func NewServerListResult() *ServerListResult {
+  return &ServerListResult{}
 }
 
-var ClientServerListResult_Success_DEFAULT *Node
-func (p *ClientServerListResult) GetSuccess() *Node {
+var ServerListResult_Success_DEFAULT *Node
+func (p *ServerListResult) GetSuccess() *Node {
   if !p.IsSetSuccess() {
-    return ClientServerListResult_Success_DEFAULT
+    return ServerListResult_Success_DEFAULT
   }
 return p.Success
 }
-func (p *ClientServerListResult) IsSetSuccess() bool {
+func (p *ServerListResult) IsSetSuccess() bool {
   return p.Success != nil
 }
 
-func (p *ClientServerListResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerListResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
   if _, err := iprot.ReadStructBegin(ctx); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
@@ -2508,7 +3288,7 @@ func (p *ClientServerListResult) Read(ctx context.Context, iprot thrift.TProtoco
   return nil
 }
 
-func (p *ClientServerListResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
+func (p *ServerListResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
   p.Success = &Node{}
   if err := p.Success.Read(ctx, iprot); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Success), err)
@@ -2516,7 +3296,7 @@ func (p *ClientServerListResult)  ReadField0(ctx context.Context, iprot thrift.T
   return nil
 }
 
-func (p *ClientServerListResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (p *ServerListResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
   if err := oprot.WriteStructBegin(ctx, "List_result"); err != nil {
     return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
   if p != nil {
@@ -2529,7 +3309,7 @@ func (p *ClientServerListResult) Write(ctx context.Context, oprot thrift.TProtoc
   return nil
 }
 
-func (p *ClientServerListResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
+func (p *ServerListResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
   if p.IsSetSuccess() {
     if err := oprot.WriteFieldBegin(ctx, "success", thrift.STRUCT, 0); err != nil {
       return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err) }
@@ -2542,93 +3322,209 @@ func (p *ClientServerListResult) writeField0(ctx context.Context, oprot thrift.T
   return err
 }
 
-func (p *ClientServerListResult) String() string {
+func (p *ServerListResult) String() string {
   if p == nil {
     return "<nil>"
   }
-  return fmt.Sprintf("ClientServerListResult(%+v)", *p)
+  return fmt.Sprintf("ServerListResult(%+v)", *p)
 }
 
-
-type DNService interface {}
-
-type DNServiceClient struct {
-  c thrift.TClient
-  meta thrift.ResponseMeta
+// Attributes:
+//  - Dninfo
+type ServerRegisterArgs struct {
+  Dninfo *DN `thrift:"dninfo,1" db:"dninfo" json:"dninfo"`
 }
 
-func NewDNServiceClientFactory(t thrift.TTransport, f thrift.TProtocolFactory) *DNServiceClient {
-  return &DNServiceClient{
-    c: thrift.NewTStandardClient(f.GetProtocol(t), f.GetProtocol(t)),
+func NewServerRegisterArgs() *ServerRegisterArgs {
+  return &ServerRegisterArgs{}
+}
+
+var ServerRegisterArgs_Dninfo_DEFAULT *DN
+func (p *ServerRegisterArgs) GetDninfo() *DN {
+  if !p.IsSetDninfo() {
+    return ServerRegisterArgs_Dninfo_DEFAULT
   }
+return p.Dninfo
+}
+func (p *ServerRegisterArgs) IsSetDninfo() bool {
+  return p.Dninfo != nil
 }
 
-func NewDNServiceClientProtocol(t thrift.TTransport, iprot thrift.TProtocol, oprot thrift.TProtocol) *DNServiceClient {
-  return &DNServiceClient{
-    c: thrift.NewTStandardClient(iprot, oprot),
+func (p *ServerRegisterArgs) Read(ctx context.Context, iprot thrift.TProtocol) error {
+  if _, err := iprot.ReadStructBegin(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
   }
-}
 
-func NewDNServiceClient(c thrift.TClient) *DNServiceClient {
-  return &DNServiceClient{
-    c: c,
+
+  for {
+    _, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
+    if err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+    }
+    if fieldTypeId == thrift.STOP { break; }
+    switch fieldId {
+    case 1:
+      if fieldTypeId == thrift.STRUCT {
+        if err := p.ReadField1(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    default:
+      if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+        return err
+      }
+    }
+    if err := iprot.ReadFieldEnd(ctx); err != nil {
+      return err
+    }
   }
-}
-
-func (p *DNServiceClient) Client_() thrift.TClient {
-  return p.c
-}
-
-func (p *DNServiceClient) LastResponseMeta_() thrift.ResponseMeta {
-  return p.meta
-}
-
-func (p *DNServiceClient) SetLastResponseMeta_(meta thrift.ResponseMeta) {
-  p.meta = meta
-}
-
-type DNServiceProcessor struct {
-  processorMap map[string]thrift.TProcessorFunction
-  handler DNService
-}
-
-func (p *DNServiceProcessor) AddToProcessorMap(key string, processor thrift.TProcessorFunction) {
-  p.processorMap[key] = processor
-}
-
-func (p *DNServiceProcessor) GetProcessorFunction(key string) (processor thrift.TProcessorFunction, ok bool) {
-  processor, ok = p.processorMap[key]
-  return processor, ok
-}
-
-func (p *DNServiceProcessor) ProcessorMap() map[string]thrift.TProcessorFunction {
-  return p.processorMap
-}
-
-func NewDNServiceProcessor(handler DNService) *DNServiceProcessor {
-
-  self53 := &DNServiceProcessor{handler:handler, processorMap:make(map[string]thrift.TProcessorFunction)}
-return self53
-}
-
-func (p *DNServiceProcessor) Process(ctx context.Context, iprot, oprot thrift.TProtocol) (success bool, err thrift.TException) {
-  name, _, seqId, err2 := iprot.ReadMessageBegin(ctx)
-  if err2 != nil { return false, thrift.WrapTException(err2) }
-  if processor, ok := p.GetProcessorFunction(name); ok {
-    return processor.Process(ctx, seqId, iprot, oprot)
+  if err := iprot.ReadStructEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
   }
-  iprot.Skip(ctx, thrift.STRUCT)
-  iprot.ReadMessageEnd(ctx)
-  x54 := thrift.NewTApplicationException(thrift.UNKNOWN_METHOD, "Unknown function " + name)
-  oprot.WriteMessageBegin(ctx, name, thrift.EXCEPTION, seqId)
-  x54.Write(ctx, oprot)
-  oprot.WriteMessageEnd(ctx)
-  oprot.Flush(ctx)
-  return false, x54
-
+  return nil
 }
 
+func (p *ServerRegisterArgs)  ReadField1(ctx context.Context, iprot thrift.TProtocol) error {
+  p.Dninfo = &DN{}
+  if err := p.Dninfo.Read(ctx, iprot); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Dninfo), err)
+  }
+  return nil
+}
 
-// HELPER FUNCTIONS AND STRUCTURES
+func (p *ServerRegisterArgs) Write(ctx context.Context, oprot thrift.TProtocol) error {
+  if err := oprot.WriteStructBegin(ctx, "Register_args"); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
+  if p != nil {
+    if err := p.writeField1(ctx, oprot); err != nil { return err }
+  }
+  if err := oprot.WriteFieldStop(ctx); err != nil {
+    return thrift.PrependError("write field stop error: ", err) }
+  if err := oprot.WriteStructEnd(ctx); err != nil {
+    return thrift.PrependError("write struct stop error: ", err) }
+  return nil
+}
+
+func (p *ServerRegisterArgs) writeField1(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if err := oprot.WriteFieldBegin(ctx, "dninfo", thrift.STRUCT, 1); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field begin error 1:dninfo: ", p), err) }
+  if err := p.Dninfo.Write(ctx, oprot); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.Dninfo), err)
+  }
+  if err := oprot.WriteFieldEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write field end error 1:dninfo: ", p), err) }
+  return err
+}
+
+func (p *ServerRegisterArgs) String() string {
+  if p == nil {
+    return "<nil>"
+  }
+  return fmt.Sprintf("ServerRegisterArgs(%+v)", *p)
+}
+
+// Attributes:
+//  - Success
+type ServerRegisterResult struct {
+  Success *Resp `thrift:"success,0" db:"success" json:"success,omitempty"`
+}
+
+func NewServerRegisterResult() *ServerRegisterResult {
+  return &ServerRegisterResult{}
+}
+
+var ServerRegisterResult_Success_DEFAULT *Resp
+func (p *ServerRegisterResult) GetSuccess() *Resp {
+  if !p.IsSetSuccess() {
+    return ServerRegisterResult_Success_DEFAULT
+  }
+return p.Success
+}
+func (p *ServerRegisterResult) IsSetSuccess() bool {
+  return p.Success != nil
+}
+
+func (p *ServerRegisterResult) Read(ctx context.Context, iprot thrift.TProtocol) error {
+  if _, err := iprot.ReadStructBegin(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read error: ", p), err)
+  }
+
+
+  for {
+    _, fieldTypeId, fieldId, err := iprot.ReadFieldBegin(ctx)
+    if err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T field %d read error: ", p, fieldId), err)
+    }
+    if fieldTypeId == thrift.STOP { break; }
+    switch fieldId {
+    case 0:
+      if fieldTypeId == thrift.STRUCT {
+        if err := p.ReadField0(ctx, iprot); err != nil {
+          return err
+        }
+      } else {
+        if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+          return err
+        }
+      }
+    default:
+      if err := iprot.Skip(ctx, fieldTypeId); err != nil {
+        return err
+      }
+    }
+    if err := iprot.ReadFieldEnd(ctx); err != nil {
+      return err
+    }
+  }
+  if err := iprot.ReadStructEnd(ctx); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+  }
+  return nil
+}
+
+func (p *ServerRegisterResult)  ReadField0(ctx context.Context, iprot thrift.TProtocol) error {
+  p.Success = &Resp{}
+  if err := p.Success.Read(ctx, iprot); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T error reading struct: ", p.Success), err)
+  }
+  return nil
+}
+
+func (p *ServerRegisterResult) Write(ctx context.Context, oprot thrift.TProtocol) error {
+  if err := oprot.WriteStructBegin(ctx, "Register_result"); err != nil {
+    return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err) }
+  if p != nil {
+    if err := p.writeField0(ctx, oprot); err != nil { return err }
+  }
+  if err := oprot.WriteFieldStop(ctx); err != nil {
+    return thrift.PrependError("write field stop error: ", err) }
+  if err := oprot.WriteStructEnd(ctx); err != nil {
+    return thrift.PrependError("write struct stop error: ", err) }
+  return nil
+}
+
+func (p *ServerRegisterResult) writeField0(ctx context.Context, oprot thrift.TProtocol) (err error) {
+  if p.IsSetSuccess() {
+    if err := oprot.WriteFieldBegin(ctx, "success", thrift.STRUCT, 0); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T write field begin error 0:success: ", p), err) }
+    if err := p.Success.Write(ctx, oprot); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T error writing struct: ", p.Success), err)
+    }
+    if err := oprot.WriteFieldEnd(ctx); err != nil {
+      return thrift.PrependError(fmt.Sprintf("%T write field end error 0:success: ", p), err) }
+  }
+  return err
+}
+
+func (p *ServerRegisterResult) String() string {
+  if p == nil {
+    return "<nil>"
+  }
+  return fmt.Sprintf("ServerRegisterResult(%+v)", *p)
+}
 
 

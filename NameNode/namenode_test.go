@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"namenode/DNServer"
 	"namenode/NNServer"
 	"testing"
 
@@ -12,7 +11,7 @@ import (
 
 var ctx = context.Background()
 
-func GetClient(addr string) *NNServer.ClientServerClient {
+func GetClient(addr string) *NNServer.ServerClient {
 	var transport thrift.TTransport
 	var err error
 	transport, err = thrift.NewTSocket(addr)
@@ -40,7 +39,7 @@ func GetClient(addr string) *NNServer.ClientServerClient {
 	iprot := protocolFactory.GetProtocol(transport)
 	oprot := protocolFactory.GetProtocol(transport)
 
-	client := NNServer.NewClientServerClient(thrift.NewTStandardClient(iprot, oprot))
+	client := NNServer.NewServerClient(thrift.NewTStandardClient(iprot, oprot))
 	return client
 }
 
@@ -52,7 +51,7 @@ func TestPutFile(t *testing.T) {
 	// 	SocketTimeout:  time.Second, // Use 0 for no timeout
 	// }
 	client := GetClient(addr)
-	file := &DNServer.File{}
+	file := &NNServer.File{}
 	file.FileName = "thrift"
 	file.Size = 23
 	rep, err := client.PutFile(ctx, file)
@@ -71,7 +70,7 @@ func TestStat(t *testing.T) {
 	// 	SocketTimeout:  time.Second, // Use 0 for no timeout
 	// }
 	client := GetClient(addr)
-	file := &DNServer.File{}
+	file := &NNServer.File{}
 	file.FileName = "thrift"
 	file.Size = 23
 
