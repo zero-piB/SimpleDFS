@@ -394,7 +394,7 @@ class getChunk_result(object):
                 break
             if fid == 0:
                 if ftype == TType.STRUCT:
-                    self.success = Msg.ttypes.Resp()
+                    self.success = Chunk.ttypes.Chunk()
                     self.success.read(iprot)
                 else:
                     iprot.skip(ftype)
@@ -430,7 +430,7 @@ class getChunk_result(object):
         return not (self == other)
 all_structs.append(getChunk_result)
 getChunk_result.thrift_spec = (
-    (0, TType.STRUCT, 'success', [Msg.ttypes.Resp, None], None, ),  # 0
+    (0, TType.STRUCT, 'success', [Chunk.ttypes.Chunk, None], None, ),  # 0
 )
 fix_spec(all_structs)
 del all_structs
